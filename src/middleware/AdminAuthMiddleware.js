@@ -15,12 +15,13 @@ module.exports = (req, res, next) => {
 
     // Check if the user has admin privileges
     if (decoded.role !== "admin") {
-      return res.status(403).json({ message: "Access denied: You are not an admin" });
+      return res
+        .status(403)
+        .json({ message: "Access denied: You are not an admin" });
     }
 
     req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
     next(); // Proceed to the next middleware/controller
-
   } catch (error) {
     return res.status(403).json({ message: "Invalid token" });
   }

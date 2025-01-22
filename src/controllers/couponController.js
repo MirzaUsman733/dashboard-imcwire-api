@@ -3,18 +3,35 @@ const connection = require("../config/dbconfig");
 // ✅ **Create a new coupon (Admin Only)**
 exports.createCoupon = async (req, res) => {
   try {
-    const { couponCode, discountPercentage, plan_id, usageLimit, expirationDate } = req.body;
+    const {
+      couponCode,
+      discountPercentage,
+      plan_id,
+      usageLimit,
+      expirationDate,
+    } = req.body;
 
     if (!couponCode || !discountPercentage) {
-      return res.status(400).json({ message: "Coupon code and discount percentage are required" });
+      return res
+        .status(400)
+        .json({ message: "Coupon code and discount percentage are required" });
     }
 
     const [result] = await connection.query(
       "INSERT INTO coupons (couponCode, discountPercentage, plan_id, usageLimit, expirationDate) VALUES (?, ?, ?, ?, ?)",
-      [couponCode, discountPercentage, plan_id || null, usageLimit || 0, expirationDate || null]
+      [
+        couponCode,
+        discountPercentage,
+        plan_id || null,
+        usageLimit || 0,
+        expirationDate || null,
+      ]
     );
 
-    res.status(201).json({ message: "Coupon created successfully", couponId: result.insertId });
+    res.status(201).json({
+      message: "Coupon created successfully",
+      couponId: result.insertId,
+    });
   } catch (error) {
     console.error("Error creating coupon:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -54,27 +71,29 @@ exports.updateCoupon = async (req, res) => {
 
 // ✅ **Get All Coupons (Superadmin Only)**
 exports.getAllCoupons = async (req, res) => {
-    try {
-      const [coupons] = await connection.query("SELECT * FROM coupons ORDER BY created_at DESC");
-      res.status(200).json(coupons);
-    } catch (error) {
-      console.error("Error fetching coupons:", error);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  };
-  
-  // ✅ **Get Active Coupons (Users Only)**
-  exports.getUserCoupons = async (req, res) => {
-    try {
-      const [coupons] = await connection.query(
-        "SELECT * FROM coupons WHERE status = 'active' ORDER BY created_at DESC"
-      );
-      res.status(200).json(coupons);
-    } catch (error) {
-      console.error("Error fetching coupons:", error);
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  };
+  try {
+    const [coupons] = await connection.query(
+      "SELECT * FROM coupons ORDER BY created_at DESC"
+    );
+    res.status(200).json(coupons);
+  } catch (error) {
+    console.error("Error fetching coupons:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ✅ **Get Active Coupons (Users Only)**
+exports.getUserCoupons = async (req, res) => {
+  try {
+    const [coupons] = await connection.query(
+      "SELECT * FROM coupons WHERE status = 'active' ORDER BY created_at DESC"
+    );
+    res.status(200).json(coupons);
+  } catch (error) {
+    console.error("Error fetching coupons:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 
 // ✅ **Validate a Coupon Code**
 exports.validateCoupon = async (req, res) => {
@@ -97,7 +116,10 @@ exports.validateCoupon = async (req, res) => {
 
     // Check expiration and usage limit
     const currentTime = new Date();
-    if (coupon.expirationDate && new Date(coupon.expirationDate) < currentTime) {
+    if (
+      coupon.expirationDate &&
+      new Date(coupon.expirationDate) < currentTime
+    ) {
       return res.status(400).json({ message: "Coupon has expired" });
     }
     if (coupon.usageLimit > 0 && coupon.timesUsed >= coupon.usageLimit) {

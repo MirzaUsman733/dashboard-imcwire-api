@@ -1,140 +1,3 @@
-// const connection = require("../config/dbconfig");
-// const bcrypt = require("bcryptjs");
-// const jwt = require("jsonwebtoken");
-// require("dotenv").config();
-
-// // Register a new user
-// exports.registerUser = async (req, res) => {
-//   const { username, email, password } = req.body;
-
-//   try {
-//     const [existingUser] = await connection.query(
-//       "SELECT * FROM auth_user WHERE email = ?",
-//       [email]
-//     );
-//     if (existingUser.length > 0) {
-//       return res.status(400).json({ message: "User already exists" });
-//     }
-
-//     const salt = await bcrypt.genSalt(10);
-//     const password_hash = await bcrypt.hash(password, salt);
-
-//     const result = await connection.query(
-//       "INSERT INTO auth_user (username, email, password) VALUES (?, ?, ?)",
-//       [username, email, password_hash]
-//     );
-
-//     const userId = result[0].insertId;
-
-//     const token = jwt.sign({ id: userId, email }, process.env.JWT_SECRET, {
-//       expiresIn: "1h",
-//     });
-
-//     res.status(201).json({
-//       message: "User registered successfully and logged in",
-//       token,
-//       name: username,
-//       email,
-//       isActive: true,
-//       isTrue: true,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       error: "Error registering user",
-//       isActive: false,
-//       isTrue: false,
-//     });
-//   }
-// };
-
-// exports.loginUser = async (req, res) => {
-//   const { email, password } = req.body;
-
-//   try {
-//     const [results] = await connection.query(
-//       "SELECT * FROM auth_user WHERE email = ?",
-//       [email]
-//     );
-//     const user = results[0];
-
-//     if (!user) {
-//       return res.status(400).json({ message: "Email or Password is Invalid" });
-//     }
-
-//     const validPassword = await bcrypt.compare(password, user.password);
-//     if (!validPassword) {
-//       return res.status(400).json({ message: "Email or Password is Invalid" });
-//     }
-
-//     const token = jwt.sign(
-//       { id: user.auth_user_id, email: user.email },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "1h" }
-//     );
-
-//     res.status(200).json({
-//       message: "Login successful",
-//       token,
-//       name: user.username,
-//       email: user.email,
-//       isActive: true,
-//       isTrue: true,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       error: "Error logging in user",
-//       isActive: false,
-//       isTrue: false,
-//     });
-//   }
-// };
-
-// exports.updateUser = async (req, res) => {
-//   const { id } = req.user;
-//   const { username, password } = req.body;
-//   const updates = {};
-//   try {
-//     if (username) {
-//       updates.username = username;
-//     }
-
-//     if (password) {
-//       const salt = await bcrypt.genSalt(10);
-//       updates.password = await bcrypt.hash(password, salt);
-//     }
-
-//     const query = [];
-//     const values = [];
-
-//     Object.keys(updates).forEach((key) => {
-//       query.push(`${key} = ?`);
-//       values.push(updates[key]);
-//     });
-
-//     if (query.length === 0) {
-//       return res
-//         .status(400)
-//         .json({ message: "No valid fields provided for update" });
-//     }
-
-//     values.push(id);
-
-//     await connection.query(
-//       `UPDATE auth_user SET ${query.join(", ")} WHERE auth_user_id = ?`,
-//       values
-//     );
-
-//     res.status(200).json({
-//       message: "User updated successfully",
-//       updates: updates,
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       error: "Error updating user",
-//     });
-//   }
-// };
-
 const connection = require("../config/dbconfig");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -283,7 +146,7 @@ exports.registerUser = async (req, res) => {
 
 // Login user
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, ipAddress } = req.body;
 
   try {
     const [results] = await connection.query(
@@ -327,6 +190,11 @@ exports.loginUser = async (req, res) => {
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
+    );
+    // Store login history
+    await connection.query(
+      "INSERT INTO login_history (user_id, email, ip_address) VALUES (?, ?, ?)",
+      [user.auth_user_id, user.email, ipAddress]
     );
 
     res.status(200).json({
@@ -440,11 +308,27 @@ exports.resetPassword = async (req, res) => {
 // Update User API with Status Change Notifications
 exports.updateUser = async (req, res) => {
   const { id } = req.user;
-  const { username, currentPassword, newPassword, isAgency } = req.body;
-  const updates = {};
+  const {
+    username,
+    currentPassword,
+    newPassword,
+    isAgency,
+    full_name,
+    image_url,
+    street_address,
+    city,
+    country,
+    zip_code,
+    phone_number,
+    gender,
+    date_of_birth,
+  } = req.body;
+
+  const userUpdates = {};
+  const profileUpdates = {};
 
   try {
-    // Fetch the current user data
+    // Fetch user from auth_user
     const [users] = await connection.query(
       "SELECT * FROM auth_user WHERE auth_user_id = ?",
       [id]
@@ -457,15 +341,17 @@ exports.updateUser = async (req, res) => {
 
     // Update username
     if (username) {
-      updates.username = username;
+      userUpdates.username = username;
     }
 
     // Update password (requires current password)
     if (newPassword) {
       if (!currentPassword) {
-        return res.status(400).json({
-          message: "Current password is required to update the password",
-        });
+        return res
+          .status(400)
+          .json({
+            message: "Current password is required to update the password",
+          });
       }
 
       const isPasswordValid = await bcrypt.compare(
@@ -479,54 +365,81 @@ exports.updateUser = async (req, res) => {
       }
 
       const salt = await bcrypt.genSalt(10);
-      updates.password = await bcrypt.hash(newPassword, salt);
+      userUpdates.password = await bcrypt.hash(newPassword, salt);
     }
 
-    // Update Agency Status
+    // Update isAgency status
     if (isAgency !== undefined) {
-      updates.isAgency = isAgency;
+      userUpdates.isAgency = isAgency;
     }
 
-    // Update Status (Admin Only)
-    // let statusChanged = false;
-    // if (
-    //   status &&
-    //   ["active", "temporary_block", "permanent_block", "deleted"].includes(
-    //     status
-    //   )
-    // ) {
-    //   if (user.status !== status) {
-    //     statusChanged = true;
-    //     updates.status = status;
-    //   }
-    // }
+    // Update user details in auth_user if any changes exist
+    if (Object.keys(userUpdates).length > 0) {
+      const query = Object.keys(userUpdates)
+        .map((key) => `${key} = ?`)
+        .join(", ");
+      const values = Object.values(userUpdates);
+      values.push(id);
 
-    // If no updates, return an error
-    if (Object.keys(updates).length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No valid fields provided for update" });
+      await connection.query(
+        `UPDATE auth_user SET ${query} WHERE auth_user_id = ?`,
+        values
+      );
     }
 
-    // Prepare SQL Query
-    const query = [];
-    const values = [];
-
-    Object.keys(updates).forEach((key) => {
-      query.push(`${key} = ?`);
-      values.push(updates[key]);
-    });
-
-    values.push(id);
-
-    // Execute Update Query
-    await connection.query(
-      `UPDATE auth_user SET ${query.join(", ")} WHERE auth_user_id = ?`,
-      values
+    // Check if user profile exists
+    const [profile] = await connection.query(
+      "SELECT * FROM user_profile WHERE user_id = ?",
+      [id]
     );
-    if (updates.password) {
-      delete updates.password;
+
+    // Prepare profile updates
+    if (full_name) profileUpdates.full_name = full_name;
+    if (image_url) profileUpdates.image_url = image_url;
+    if (street_address) profileUpdates.street_address = street_address;
+    if (city) profileUpdates.city = city;
+    if (country) profileUpdates.country = country;
+    if (zip_code) profileUpdates.zip_code = zip_code;
+    if (phone_number) profileUpdates.phone_number = phone_number;
+    if (gender) profileUpdates.gender = gender;
+    if (date_of_birth) profileUpdates.date_of_birth = date_of_birth;
+
+    if (profile.length > 0) {
+      // Update existing profile
+      if (Object.keys(profileUpdates).length > 0) {
+        const profileQuery = Object.keys(profileUpdates)
+          .map((key) => `${key} = ?`)
+          .join(", ");
+        const profileValues = Object.values(profileUpdates);
+        profileValues.push(id);
+
+        await connection.query(
+          `UPDATE user_profile SET ${profileQuery} WHERE user_id = ?`,
+          profileValues
+        );
+      }
+    } else {
+      // Create a new profile if it doesn't exist
+      if (Object.keys(profileUpdates).length > 0) {
+        await connection.query(
+          `INSERT INTO user_profile (user_id, full_name, image_url, street_address, city, country, zip_code, phone_number, gender, date_of_birth)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            full_name,
+            image_url,
+            street_address,
+            city,
+            country,
+            zip_code,
+            phone_number,
+            gender,
+            date_of_birth,
+          ]
+        );
+      }
     }
+
     // Send Email Notification for Password Change
     if (newPassword) {
       const mailOptions = {
@@ -545,11 +458,10 @@ exports.updateUser = async (req, res) => {
       await transporter.sendMail(mailOptions);
     }
 
-    // Send Email Notification for Status Change
-
     res.status(200).json({
-      message: "User updated successfully",
-      updates,
+      message: "User and profile updated successfully",
+      userUpdates,
+      profileUpdates,
     });
   } catch (error) {
     console.error("Error updating user:", error);
@@ -724,5 +636,91 @@ exports.superadminUpdateUser = async (req, res) => {
   } catch (error) {
     console.error("Error updating user role/status:", error);
     res.status(500).json({ error: "Error updating user role/status" });
+  }
+};
+
+// ✅ Add User Profile API
+exports.addUserProfile = async (req, res) => {
+  const { id } = req.user;
+  const {
+    full_name,
+    image_url,
+    street_address,
+    city,
+    country,
+    zip_code,
+    phone_number,
+    gender,
+    date_of_birth,
+  } = req.body;
+
+  try {
+    // Check if profile already exists
+    const [profile] = await connection.query(
+      "SELECT * FROM user_profile WHERE user_id = ?",
+      [id]
+    );
+
+    if (profile.length > 0) {
+      return res.status(400).json({ message: "Profile already exists" });
+    }
+
+    // Insert new profile
+    await connection.query(
+      `INSERT INTO user_profile (user_id, full_name, image_url, street_address, city, country, zip_code, phone_number, gender, date_of_birth) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        full_name,
+        image_url,
+        street_address,
+        city,
+        country,
+        zip_code,
+        phone_number,
+        gender,
+        date_of_birth,
+      ]
+    );
+
+    res.status(201).json({ message: "Profile added successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Error adding profile" });
+  }
+};
+
+// ✅ Get User Profile API
+exports.getUserProfile = async (req, res) => {
+  const { id } = req.user;
+
+  try {
+    // Get user info from auth_user
+    const [userResults] = await connection.query(
+      "SELECT username, email, isAgency FROM auth_user WHERE auth_user_id = ?",
+      [id]
+    );
+    const user = userResults[0];
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get user profile info from user_profile
+    const [profileResults] = await connection.query(
+      "SELECT * FROM user_profile WHERE user_id = ?",
+      [id]
+    );
+    const profile = profileResults[0] || {};
+
+    // Combine both user data and profile data
+    const userData = {
+      username: user.username,
+      email: user.email,
+      isAgency: user.isAgency === 0 ? false : true,
+      profile,
+    };
+
+    res.status(200).json(userData);
+  } catch (error) {
+    res.status(500).json({ error: "Error fetching user profile" });
   }
 };

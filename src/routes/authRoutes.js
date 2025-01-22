@@ -49,6 +49,14 @@ router.put(
   authController.updateUser
 );
 
-module.exports = router;
+// User Profile APIs
+router.post("/profile/add", authMiddleware, authController.addUserProfile);
 
-router.put("/superadmin-update", SuperAdminAuthMiddleware, authController.superadminUpdateUser);
+router.get("/profile/get", authMiddleware, authController.getUserProfile);
+
+router.put(
+  "/superadmin-update",
+  SuperAdminAuthMiddleware,
+  authController.superadminUpdateUser
+);
+module.exports = router;

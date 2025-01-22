@@ -26,6 +26,6 @@ router.delete(
 );
 
 // Public route
-router.get("/list",apiKeyMiddleware, planController.getPlans);
+router.get("/list", apiKeyMiddleware, planController.getPlans);
 
 module.exports = router;

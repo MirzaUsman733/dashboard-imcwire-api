@@ -3,7 +3,14 @@ const connection = require("../config/dbconfig");
 // Create a new plan (Admin Only)
 exports.createPlan = async (req, res) => {
   try {
-    const { planName, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR } = req.body;
+    const {
+      planName,
+      totalPlanPrice,
+      priceSingle,
+      planDescription,
+      pdfLink,
+      numberOfPR,
+    } = req.body;
 
     if (!planName || !totalPlanPrice || !priceSingle || !numberOfPR) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -11,10 +18,19 @@ exports.createPlan = async (req, res) => {
 
     const [result] = await connection.query(
       "INSERT INTO plan_items (planName, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR) VALUES (?, ?, ?, ?, ?, ?)",
-      [planName, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR]
+      [
+        planName,
+        totalPlanPrice,
+        priceSingle,
+        planDescription,
+        pdfLink,
+        numberOfPR,
+      ]
     );
 
-    res.status(201).json({ message: "Plan added successfully", planId: result.insertId });
+    res
+      .status(201)
+      .json({ message: "Plan added successfully", planId: result.insertId });
   } catch (error) {
     console.error("Error adding plan:", error);
     res.status(500).json({ message: "Internal Server Error" });
@@ -55,7 +71,9 @@ exports.updatePlan = async (req, res) => {
 // Get all plans
 exports.getPlans = async (req, res) => {
   try {
-    const [plans] = await connection.query("SELECT * FROM plan_items ORDER BY created_at DESC");
+    const [plans] = await connection.query(
+      "SELECT * FROM plan_items ORDER BY created_at DESC"
+    );
     res.status(200).json(plans);
   } catch (error) {
     console.error("Error fetching plans:", error);
