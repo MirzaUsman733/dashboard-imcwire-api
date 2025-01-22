@@ -13,7 +13,39 @@ exports.submitSinglePR = async (req, res) => {
   try {
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction();
-    // ✅ 1. Check if the company belongs to the authenticated user
+
+    // ✅ 1. Fetch PR data and verify ownership
+    const [prData] = await dbConnection.query(
+      "SELECT id, user_id, prType, payment_status, pr_status FROM pr_data WHERE id = ?",
+      [pr_id]
+    );
+
+    if (prData.length === 0) {
+      return res.status(404).json({ message: "PR not found." });
+    }
+
+    const pr = prData[0];
+
+    // ✅ 2. Check if PR belongs to the requesting user
+    if (pr.user_id !== user_id) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized: This PR does not belong to you." });
+    }
+
+    // ✅ 3. Check if PR is paid
+    if (pr.payment_status !== "paid") {
+      return res.status(400).json({ message: "PR is not paid yet." });
+    }
+
+    // ✅ 4. Check if PR status is pending (Admin Approval Required)
+    if (pr.pr_status === "pending") {
+      return res
+        .status(403)
+        .json({ message: "Waiting for approval from the admin." });
+    }
+
+    // ✅ 5. Check if the company belongs to the authenticated user
     const [companyData] = await dbConnection.query(
       "SELECT id FROM companies WHERE id = ? AND user_id = ?",
       [company_id, user_id]
@@ -23,28 +55,18 @@ exports.submitSinglePR = async (req, res) => {
         .status(404)
         .json({ message: "Company not found or does not belong to the user." });
     }
-    // ✅ 1. Check if PR is Paid
-    const [prData] = await dbConnection.query(
-      "SELECT id, prType, payment_status FROM pr_data WHERE id = ? AND payment_status = 'paid'",
-      [pr_id]
-    );
 
-    if (prData.length === 0) {
-      return res.status(400).json({ message: "PR is not paid yet." });
-    }
-
-    const pr_type = prData[0].prType;
-
-    // Validate required fields based on PR type
+    const pr_type = pr.prType;
+    // ✅ 6. Validate required fields based on PR type
     if (pr_type === "Self-Written") {
       if (!pdf_file) {
         return res
           .status(400)
           .json({ message: "PDF file is required for Self-Written PRs." });
       }
-      if (tags || url) {
+      if (url || (tags && tags.length > 0)) {
         return res.status(400).json({
-          message: "Tags and URL are not allowed for Self-Written PRs.",
+          message: "URL and Tags are not allowed for Self-Written PRs.",
         });
       }
     } else if (pr_type === "IMCWire Written") {
@@ -52,6 +74,11 @@ exports.submitSinglePR = async (req, res) => {
         return res
           .status(400)
           .json({ message: "URL is required for IMCWire Written PRs." });
+      }
+      if (!tags || tags.length === 0) {
+        return res.status(400).json({
+          message: "Tags are required for IMCWire Written PRs.",
+        });
       }
       if (pdf_file) {
         return res.status(400).json({
@@ -62,21 +89,21 @@ exports.submitSinglePR = async (req, res) => {
       return res.status(400).json({ message: "Invalid PR type." });
     }
 
-    // ✅ 2. Get User's Active Plan
+    // ✅ 7. Get User's Active Plan
     let [planRecord] = await dbConnection.query(
       "SELECT id, used_prs, plan_id, total_prs FROM plan_records WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
       [user_id]
     );
-    console.log(planRecord);
+
     let planId;
     let totalPrs;
     let usedPrs = 0;
 
     if (planRecord.length === 0) {
-      // ✅ 3. If no active plan, create a new plan record
+      // ✅ 8. If no active plan, create a new plan record
       const [userPlan] = await dbConnection.query(
-        "SELECT plan_id FROM pr_data WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-        [user_id]
+        "SELECT plan_id FROM pr_data WHERE id = ? AND user_id = ?",
+        [pr_id, user_id]
       );
 
       if (userPlan.length === 0) {
@@ -87,7 +114,7 @@ exports.submitSinglePR = async (req, res) => {
 
       const userPlanId = userPlan[0].plan_id;
 
-      // ✅ 4. Get Total PRs from `plan_items`
+      // ✅ 9. Get Total PRs from `plan_items`
       const [planItem] = await dbConnection.query(
         "SELECT numberOfPr FROM plan_items WHERE id = ?",
         [userPlanId]
@@ -99,7 +126,7 @@ exports.submitSinglePR = async (req, res) => {
 
       totalPrs = planItem[0].numberOfPr;
 
-      // ✅ 5. Create a new `plan_records` entry for the user
+      // ✅ 10. Create a new `plan_records` entry for the user
       const [newPlanRecord] = await dbConnection.query(
         "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs) VALUES (?, ?, ?, ?)",
         [user_id, userPlanId, totalPrs, 0]
@@ -118,7 +145,7 @@ exports.submitSinglePR = async (req, res) => {
         .json({ message: "PR limit reached for this plan." });
     }
 
-    // ✅ 7. Insert Single PR Details with Status 'Not Started'
+    // ✅ 11. Insert Single PR Details with Status 'Not Started'
     const [singlePrResult] = await dbConnection.query(
       "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type, pdf_file, url, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
@@ -133,9 +160,8 @@ exports.submitSinglePR = async (req, res) => {
     );
     const singlePrId = singlePrResult.insertId;
 
-    // ✅ 8. If IMCWire-Written, Insert Tags
-    // ✅ 9. If IMCWire-Written, Insert Tags Properly (Only if provided)
-    if (pr_type === "IMCWire-Written" && tags && tags.length > 0) {
+    // ✅ 12. If IMCWire-Written, Insert Tags
+    if (pr_type === "IMCWire Written" && tags && tags.length > 0) {
       for (const tag of tags) {
         let tagId;
         const [existingTag] = await dbConnection.query(
@@ -160,7 +186,7 @@ exports.submitSinglePR = async (req, res) => {
       }
     }
 
-    // ✅ 9. Update Plan Usage Only If PR Is Not Rejected
+    // ✅ 13. Update Plan Usage Only If PR Is Not Rejected
     if (pr_type !== "Rejected") {
       await dbConnection.query(
         "UPDATE plan_records SET used_prs = used_prs + 1 WHERE id = ?",
