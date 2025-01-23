@@ -266,7 +266,6 @@ exports.forgotPassword = async (req, res) => {
         "Password reset email sent successfully. Please check your inbox.",
     });
   } catch (error) {
-    console.error("Error sending reset email:", error);
     res.status(500).json({ error: "Error processing password reset request" });
   }
 };
@@ -462,7 +461,6 @@ exports.updateUser = async (req, res) => {
       profileUpdates,
     });
   } catch (error) {
-    console.error("Error updating user:", error);
     res.status(500).json({ error: "Error updating user" });
   }
 };
@@ -632,7 +630,6 @@ exports.superadminUpdateUser = async (req, res) => {
       updates,
     });
   } catch (error) {
-    console.error("Error updating user role/status:", error);
     res.status(500).json({ error: "Error updating user role/status" });
   }
 };

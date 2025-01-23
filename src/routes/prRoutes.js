@@ -51,7 +51,7 @@ router.post(
   "/submit-single-pr",
   authMiddleware,
   apiKeyMiddleware,
-  checkFileUpload, // ✅ Only processes file uploads if needed
+  checkFileUpload,
   prController.submitSinglePR
 );
 
@@ -60,7 +60,7 @@ router.put(
   "/update-single-pr/:single_pr_id",
   authMiddleware,
   apiKeyMiddleware,
-  checkFileUpload, // ✅ Supports file upload for `Self-Written`
+  checkFileUpload,
   prController.updateSinglePR
 );
 

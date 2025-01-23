@@ -32,7 +32,6 @@ exports.createPlan = async (req, res) => {
       .status(201)
       .json({ message: "Plan added successfully", planId: result.insertId });
   } catch (error) {
-    console.error("Error adding plan:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -63,7 +62,6 @@ exports.updatePlan = async (req, res) => {
 
     res.status(200).json({ message: "Plan updated successfully" });
   } catch (error) {
-    console.error("Error updating plan:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -76,7 +74,6 @@ exports.getPlans = async (req, res) => {
     );
     res.status(200).json(plans);
   } catch (error) {
-    console.error("Error fetching plans:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -94,7 +91,6 @@ exports.deletePlan = async (req, res) => {
 
     res.status(200).json({ message: "Plan deleted successfully" });
   } catch (error) {
-    console.error("Error deleting plan:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

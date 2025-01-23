@@ -13,7 +13,6 @@ module.exports = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if the user has super admin privileges
     if (decoded.role !== "super_admin") {
       return res
         .status(403)
@@ -21,7 +20,7 @@ module.exports = (req, res, next) => {
     }
 
     req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
-    next(); // Proceed to the next middleware/controller
+    next();
   } catch (error) {
     return res.status(403).json({ message: "Invalid token" });
   }

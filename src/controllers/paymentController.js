@@ -43,7 +43,6 @@ exports.handleStripePayment = async (req, res) => {
       client_reference_id: sessionDetails.client_reference_id,
     });
   } catch (err) {
-    console.error("Stripe Checkout Error:", err);
     res.status(500).json({ error: `Checkout Error: ${err.message}` });
   }
 };

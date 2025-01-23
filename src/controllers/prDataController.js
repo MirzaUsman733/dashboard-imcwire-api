@@ -134,7 +134,6 @@ exports.submitPR = async (req, res) => {
     if (dbConnection) {
       await dbConnection.rollback();
     }
-    console.error("Error submitting PR:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) {
@@ -188,7 +187,6 @@ exports.getUserPRs = async (req, res) => {
 
     res.status(200).json(prData);
   } catch (error) {
-    console.error("Error retrieving user PR data:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -235,7 +233,6 @@ exports.getAllPRs = async (req, res) => {
 
     res.status(200).json(prData);
   } catch (error) {
-    console.error("Error retrieving all PR data:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
