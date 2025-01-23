@@ -347,11 +347,9 @@ exports.updateUser = async (req, res) => {
     // Update password (requires current password)
     if (newPassword) {
       if (!currentPassword) {
-        return res
-          .status(400)
-          .json({
-            message: "Current password is required to update the password",
-          });
+        return res.status(400).json({
+          message: "Current password is required to update the password",
+        });
       }
 
       const isPasswordValid = await bcrypt.compare(

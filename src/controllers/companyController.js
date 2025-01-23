@@ -211,3 +211,29 @@ exports.getCompanyDetailsById = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+// ✅ **Super Admin: Get all companies of a specific user**
+exports.getCompaniesByUserId = async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Ensure only super admins can access this route
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({ message: "Unauthorized: Super Admin access required" });
+    }
+
+    const [companies] = await connection.query(
+      "SELECT * FROM companies WHERE user_id = ? ORDER BY created_at DESC",
+      [user_id]
+    );
+
+    res.status(200).json(companies);
+  } catch (error) {
+    console.error("Error fetching user companies:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
