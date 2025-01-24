@@ -9,7 +9,7 @@ const companyRoutes = require("./routes/companyRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const prRoutes = require("./routes/prRoutes");
 const ipRoutes = require("./routes/ipRoutes");
-const fileRoutes = require("./routes/fileRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 const faqRoutes = require("./routes/faqRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
@@ -32,6 +32,7 @@ app.use("/v1/company", companyRoutes);
 app.use("/v1/coupon", couponRoutes);
 app.use("/v1/pr", prRoutes);
 app.use("/v1/faq", faqRoutes);
+app.use("/v1/reports", reportRoutes);
 // app.use("/v1/files", fileRoutes);
 
 const PORT = process.env.PORT || 3008;
