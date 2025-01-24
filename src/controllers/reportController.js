@@ -50,8 +50,7 @@ const deleteFromFTP = async (filePath) => {
 exports.createFullReport = async (req, res) => {
   let dbConnection;
   try {
-    const user_id = req.user?.id; // Extract user_id from authMiddleware
-    const { pr_id, single_pr_id, title } = req.body;
+    const { pr_id, single_pr_id, title, user_id } = req.body;
     const pdfFile = req.files["pdf"] ? req.files["pdf"][0] : null;
     const excelFile = req.files["excel"] ? req.files["excel"][0] : null;
 
@@ -77,7 +76,6 @@ exports.createFullReport = async (req, res) => {
         .json({ message: "A report has already been created for this PR." });
     }
 
-    console.log(pr_id, user_id, single_pr_id);
     // ✅ Validate PR & Single PR Submission Ownership
     const [prData] = await dbConnection.query(
       "SELECT id FROM pr_data WHERE id = ? AND user_id = ?",

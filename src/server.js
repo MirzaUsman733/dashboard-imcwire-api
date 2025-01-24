@@ -21,16 +21,16 @@ app.use(helmet());
 app.use(cors());
 app.use("/v1/webhook", webhookRoutes);
 app.use(bodyParser.json());
-app.use(express.urlencoded({ extended: true }))
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
+app.use("/v1/pr", prRoutes);
 app.use("/v1/payment", paymentRoutes);
 app.use("/v1/account", authRoutes);
 app.use("/v1/ip", ipRoutes);
 app.use("/v1/plan", planRoutes);
 app.use("/v1/company", companyRoutes);
 app.use("/v1/coupon", couponRoutes);
-app.use("/v1/pr", prRoutes);
 app.use("/v1/faq", faqRoutes);
 app.use("/v1/reports", reportRoutes);
 // app.use("/v1/files", fileRoutes);

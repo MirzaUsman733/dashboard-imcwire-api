@@ -4,7 +4,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "stripe:listen": "stripe listen --forward-to localhost:3000/api/stripe-webhooks"
   },
   "keywords": [],
   "author": "",

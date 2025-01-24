@@ -17,7 +17,24 @@ exports.createCoupon = async (req, res) => {
         .json({ message: "Coupon code and discount percentage are required" });
     }
 
-    const [result] = await connection.query(
+    const dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction();
+
+    // ✅ **Check if `plan_id` exists in `plan_data`**
+    if (plan_id) {
+      const [planCheck] = await dbConnection.query(
+        "SELECT id FROM plan_items WHERE id = ?",
+        [plan_id]
+      );
+
+      if (planCheck.length === 0) {
+        await dbConnection.rollback();
+        return res.status(404).json({ message: "Plan not found. Please provide a valid plan_id." });
+      }
+    }
+
+    // ✅ **Insert Coupon**
+    const [result] = await dbConnection.query(
       "INSERT INTO coupons (couponCode, discountPercentage, plan_id, usageLimit, expirationDate) VALUES (?, ?, ?, ?, ?)",
       [
         couponCode,
@@ -28,12 +45,16 @@ exports.createCoupon = async (req, res) => {
       ]
     );
 
+    await dbConnection.commit();
+    dbConnection.release();
+
     res.status(201).json({
       message: "Coupon created successfully",
       couponId: result.insertId,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error creating coupon:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.sqlMessage || error.message });
   }
 };
 
