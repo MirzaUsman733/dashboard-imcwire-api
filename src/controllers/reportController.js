@@ -344,7 +344,7 @@ exports.getUserReport = async (req, res) => {
   try {
     const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
     const { report_id } = req.params;
-    console.log(user_id)
+    console.log(user_id);
     dbConnection = await connection.getConnection();
 
     // ✅ Fetch Report Details
@@ -354,11 +354,9 @@ exports.getUserReport = async (req, res) => {
     );
 
     if (reportData.length === 0) {
-      return res
-        .status(404)
-        .json({
-          message: "Report not found or you don't have access to this report.",
-        });
+      return res.status(404).json({
+        message: "Report not found or you don't have access to this report.",
+      });
     }
 
     // ✅ Fetch PDF and Excel Files (if needed)

@@ -2,7 +2,6 @@ const { Client } = require("basic-ftp");
 const db = require("../config/dbconfig");
 const ftpConfig = require("../config/ftpConfig");
 const fs = require("fs");
-const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 
 // ✅ Upload PR (Handles Both PDF & URL)

@@ -179,7 +179,7 @@ exports.submitPR = async (req, res) => {
 
     // ✅ 1. Fetch User Email from `auth_user`
     const [userResult] = await dbConnection.query(
-      "SELECT email FROM auth_user WHERE auth_user_id = ?",
+      "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
       [req.user.id]
     );
 
@@ -188,14 +188,7 @@ exports.submitPR = async (req, res) => {
     }
 
     const userEmail = userResult[0].email;
-
-    // ✅ 2. Check if Plan Record Exists
-    // let [planRecord] = await dbConnection.query(
-    //   "SELECT id FROM plan_records WHERE user_id = ? AND plan_id = ?",
-    //   [req.user.id, plan_id]
-    // );
-
-    // if (planRecord.length === 0) {
+    const username = userResult[0].username;
     // ✅ 3. Get Total PRs from `plan_items`
     const [planItem] = await dbConnection.query(
       "SELECT numberOfPR FROM plan_items WHERE id = ?",
@@ -207,15 +200,6 @@ exports.submitPR = async (req, res) => {
     }
 
     const totalPrs = planItem[0].numberOfPR;
-
-    // ✅ 3. Always Create a New `plan_record` for Each PR Submission
-    const [newPlanRecord] = await dbConnection.query(
-      "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs) VALUES (?, ?, ?, ?)",
-      [req.user.id, plan_id, totalPrs, 0] // `used_prs` starts from 1 because it's a new PR
-    );
-
-    const planRecordId = newPlanRecord.insertId;
-    // }
 
     // ✅ 5. Insert Multiple Target Countries with Individual Translations
     let targetCountryIds = [];
@@ -261,6 +245,10 @@ exports.submitPR = async (req, res) => {
       ]
     );
     const prId = prResult.insertId;
+    const [newPlanRecord] = await dbConnection.query(
+      "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs, pr_id) VALUES (?, ?, ?, ?, ?)",
+      [req.user.id, plan_id, totalPrs, 0, prId] // `used_prs` starts from 1 because it's a new PR
+    );
 
     // ✅ 8. Link PR to Multiple Target Countries
     for (const countryId of targetCountryIds) {
@@ -277,47 +265,105 @@ exports.submitPR = async (req, res) => {
         [prId, categoryId]
       );
     }
-
-    // ✅ 10. Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            unit_amount: total_price * 100, // Convert to cents
-            product_data: {
-              name: "Press Release",
+    let paymentUrl;
+    console.log(payment_method);
+    if (payment_method === "Stripe") {
+      // Stripe Checkout Session
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: total_price * 100,
+              product_data: {
+                name: "Press Release",
+              },
             },
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        customer_email: userEmail,
+        client_reference_id: client_id,
+        mode: "payment",
+        success_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=true`,
+        cancel_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=false`,
+      });
+      paymentUrl = session.url;
+    } else if (payment_method === "PayPro") {
+      // PayPro Payment
+      const authResponse = await fetch(
+        `${process.env.Paypro_URL}/v2/ppro/auth`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientid: process.env.clientid,
+            clientsecret: process.env.clientsecret,
+          }),
+        }
+      );
+      console.log(authResponse);
+      if (!authResponse.ok) {
+        return res.status(401).json({ message: "Authentication failed" });
+      }
+      const token = authResponse.headers.get("Token");
+      if (!token) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      console.log(token);
+
+      const issueDate = new Date().toISOString().split("T")[0];
+      const orderDueDate = new Date();
+      orderDueDate.setDate(orderDueDate.getDate() + 1);
+      const formattedOrderDueDate = orderDueDate.toISOString().split("T")[0];
+      console.log(username);
+      const orderPayload = [
+        { MerchantId: "NUXLAY" },
+        {
+          OrderNumber: client_id,
+          CurrencyAmount: `${total_price}.00`,
+          Currency: "USD",
+          OrderDueDate: formattedOrderDueDate,
+          OrderType: "Service",
+          IsConverted: "true",
+          IssueDate: issueDate,
+          CustomerEmail: userEmail,
+          CustomerName: username,
+          CustomerMobile: "",
+          CustomerAddress: "",
         },
-      ],
-      customer_email: userEmail,
-      client_reference_id: client_id,
-      mode: "payment",
-      success_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=true`,
-      cancel_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=false`,
-    });
+      ];
 
-    await dbConnection.commit(); // Commit Transaction
-
-    res.status(201).json({
-      message: "PR submitted successfully",
-      stripeSessionUrl: session.url,
-    });
-  } catch (error) {
-    if (dbConnection) {
-      await dbConnection.rollback();
+      const orderResponse = await fetch(
+        `${process.env.Paypro_URL}/v2/ppro/co`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Token: token },
+          body: JSON.stringify(orderPayload),
+        }
+      );
+      console.log("Order Response : ", orderResponse);
+      const result = await orderResponse.json();
+      console.log("Response in Result : ", result);
+      if (orderResponse.ok && result[0]?.Status === "00") {
+        paymentUrl = `${result[1]?.Click2Pay}&callback_url=https://dashboard.imcwire.com/thankyou`;
+      } else {
+        return res.status(500).json({ message: "Order creation failed" });
+      }
+    } else {
+      return res.status(500).json({ message: "Payment Method is Incorrect" });
     }
+    await dbConnection.commit();
+    res.status(201).json({ message: "PR submitted successfully", paymentUrl });
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback();
     console.error("Error in submitPR:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
   } finally {
-    if (dbConnection) {
-      dbConnection.release();
-    }
+    if (dbConnection) dbConnection.release();
   }
 };
 

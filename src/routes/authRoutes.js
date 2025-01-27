@@ -30,10 +30,14 @@ router.post(
 );
 
 // Forgot Password
-router.post("/forgot-password", authMiddleware, authController.forgotPassword);
+router.post(
+  "/forgot-password",
+  apiKeyMiddleware,
+  authController.forgotPassword
+);
 
 // Reset Password
-router.post("/reset-password", authMiddleware, authController.resetPassword);
+router.post("/reset-password", apiKeyMiddleware, authController.resetPassword);
 
 router.put(
   "/update",

@@ -29,7 +29,9 @@ exports.createCoupon = async (req, res) => {
 
       if (planCheck.length === 0) {
         await dbConnection.rollback();
-        return res.status(404).json({ message: "Plan not found. Please provide a valid plan_id." });
+        return res
+          .status(404)
+          .json({ message: "Plan not found. Please provide a valid plan_id." });
       }
     }
 
@@ -54,7 +56,12 @@ exports.createCoupon = async (req, res) => {
     });
   } catch (error) {
     console.error("Error creating coupon:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.sqlMessage || error.message });
+    res
+      .status(500)
+      .json({
+        message: "Internal Server Error",
+        error: error.sqlMessage || error.message,
+      });
   }
 };
 

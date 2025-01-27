@@ -46,7 +46,3 @@ exports.handleStripePayment = async (req, res) => {
     res.status(500).json({ error: `Checkout Error: ${err.message}` });
   }
 };
-
-
-
-

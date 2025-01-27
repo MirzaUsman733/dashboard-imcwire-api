@@ -22,7 +22,6 @@ router.put(
   reportController.updateFullReport
 );
 
-
 // ✅ Create Report + Upload PDF & Excel in One API
 router.get(
   "/get-pr-report/:report_id",

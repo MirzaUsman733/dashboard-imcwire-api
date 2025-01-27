@@ -80,15 +80,57 @@ exports.handleStripeWebhook = async (req, res) => {
         const mailOptions = {
           from: "IMCWire <Orders@imcwire.com>",
           to: receiptEmail,
-          subject: "Your Payment Has Been Successfully Processed - IMCWire",
-          html: `
-              <p>Dear Customer,</p>
-              <p>Your payment of <strong>$${amountPaid} ${currency.toUpperCase()}</strong> has been successfully processed.</p>
-              <p>Your PR status has been updated to <strong>Paid</strong>. You can now access your PR dashboard.</p>
-              <p>Thank you for choosing IMCWire!</p>
-              <p>Best Regards,<br>IMCWire Team</p>
-            `,
-        };
+          subject: `Your Payment Has Been Successfully Processed - Transaction ${clientReferenceId}`,
+        //   html: `
+        //       <p>Dear Customer,</p>
+        //       <p>Your payment of <strong>$${amountPaid} ${currency.toUpperCase()}</strong> has been successfully processed.</p>
+        //       <p>Your PR status has been updated to <strong>Paid</strong>. You can now access your PR dashboard.</p>
+        //       <p>Thank you for choosing IMCWire!</p>
+        //       <p>Best Regards,<br>IMCWire Team</p>
+        //     `,
+        // };
+        html: `
+        <!DOCTYPE html>
+          <html lang="en">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Your Payment Has Been Successfully Processed - Welcome to IMCWire!</title>
+          </head>
+          <body style="font-family: Arial, sans-serif;">
+  
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 10px;">
+              <h2 style="text-align: center; color: #333;">Your Payment Has Been Successfully Processed - Welcome to IMCWire!</h2>
+  
+              <p>Dear ${receiptEmail},</p>
+  
+              <p>We are delighted to inform you that your payment has been successfully processed, and your subscription to IMCWire is now active. Welcome aboard!</p>
+  
+              <p>Here's a quick recap of the plan you've chosen:</p>
+  
+              <ul>
+                  <li><strong>Total Amount Paid:</strong> $ ${amountPaid}</li>
+              </ul>
+  
+              <p>Your decision to choose IMCWire as your press release distribution partner marks the beginning of an exciting journey. We are committed to providing you with the highest level of service and ensuring your news reaches your targeted audience through premier outlets like Yahoo Finance, Bloomberg, MarketWatch, and many more.</p>
+  
+              <p><strong>What's Next?</strong></p>
+  
+              <ol>
+                  <li><strong>Dashboard Access:</strong> You can now access your personalized dashboard <a href="dashboard.imcwire.com/press-dashboard/pr-balance">here</a>, where you can manage your press releases, view distribution reports, and access exclusive insights.</li>
+                  <li><strong>Schedule Your First Release:</strong> Ready to get started? Schedule your first press release for distribution through your dashboard. If you need any assistance or have special requests, our support team is here to help.</li>
+                  <li><strong>Support and Assistance:</strong> For any questions, guidance, or support, feel free to reach out to us at support@imcwire.com. We're here to ensure your experience is seamless and successful.</li>
+              </ol>
+  
+              <p>We're thrilled to have you with us and look forward to supporting your success. Here's to making headlines together!</p>
+  
+              <p><strong>Warm regards,</strong><br>The IMCWire Team</p>
+          </div>
+  
+          </body>
+          </html>
+      `,
+  };
         await transporter.sendMail(mailOptions);
 
         // ✅ Send Email to Admin
@@ -99,7 +141,7 @@ exports.handleStripeWebhook = async (req, res) => {
         const adminMailOptions = {
           from: "IMCWire <Orders@imcwire.com>",
           to: adminEmails.join(","),
-          subject: `New Payment Received - Transaction ${transactionId}`,
+          subject: `New Payment Received - Transaction ${clientReferenceId}`,
           html: `
               <p>New payment received:</p>
               <ul>

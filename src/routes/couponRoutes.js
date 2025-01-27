@@ -21,7 +21,7 @@ router.put(
   couponController.updateCoupon
 );
 // 🔹 Users Can Only See Active Coupons
-router.get("/user-list", apiKeyMiddleware, couponController.getUserCoupons);
+router.get("/active-list", apiKeyMiddleware, couponController.getUserCoupons);
 
 // 🔹 Superadmins Can See All Coupons
 router.get(
@@ -31,12 +31,7 @@ router.get(
   SuperAdminAuthMiddleware,
   couponController.getAllCoupons
 );
-router.get(
-  "/validate",
-  authMiddleware,
-  apiKeyMiddleware,
-  couponController.validateCoupon
-);
+router.get("/validate", apiKeyMiddleware, couponController.validateCoupon);
 router.delete(
   "/delete",
   authMiddleware,
