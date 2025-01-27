@@ -189,8 +189,7 @@ exports.createFullReport = async (req, res) => {
 exports.updateFullReport = async (req, res) => {
   let dbConnection;
   try {
-    const user_id = req.user?.id; // Extract user_id from authMiddleware
-    const { report_id, title } = req.body;
+    const { report_id, title, user_id } = req.body;
     const pdfFile = req.files["pdf"] ? req.files["pdf"][0] : null;
     const excelFile = req.files["excel"] ? req.files["excel"][0] : null;
 
@@ -260,7 +259,7 @@ exports.updateFullReport = async (req, res) => {
         [
           existingReport[0].single_pr_id,
           pdfUniqueId,
-          pdfFileName,
+          sanitizedPdfName,
           pdfFtpPath.replace("/public_html/files", ""),
         ]
       );
@@ -312,7 +311,7 @@ exports.updateFullReport = async (req, res) => {
         "INSERT INTO report_excel_files (report_id, excel_name, excel_url) VALUES (?, ?, ?)",
         [
           report_id,
-          excelFileName,
+          sanitizedExcelName,
           excelFtpPath.replace("/public_html/files", ""),
         ]
       );
@@ -338,3 +337,58 @@ exports.uploadMiddleware = upload.fields([
   { name: "pdf", maxCount: 1 },
   { name: "excel", maxCount: 1 },
 ]);
+
+// ✅ Get User Specific Report
+exports.getUserReport = async (req, res) => {
+  let dbConnection;
+  try {
+    const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
+    const { report_id } = req.params;
+    console.log(user_id)
+    dbConnection = await connection.getConnection();
+
+    // ✅ Fetch Report Details
+    const [reportData] = await dbConnection.query(
+      "SELECT * FROM reports WHERE id = ? AND user_id = ?",
+      [report_id, user_id]
+    );
+
+    if (reportData.length === 0) {
+      return res
+        .status(404)
+        .json({
+          message: "Report not found or you don't have access to this report.",
+        });
+    }
+
+    // ✅ Fetch PDF and Excel Files (if needed)
+
+    // Example: Fetch PDF files linked to this report
+    const [pdfFiles] = await dbConnection.query(
+      "SELECT pdf_name, pdf_url FROM report_pr_pdfs WHERE report_id = ?",
+      [report_id]
+    );
+
+    // Example: Fetch Excel files linked to this report
+    const [excelFiles] = await dbConnection.query(
+      "SELECT excel_name, excel_url FROM report_excel_files WHERE report_id = ?",
+      [report_id]
+    );
+
+    // Construct response object with report details and files
+    const report = {
+      id: reportData[0].id,
+      title: reportData[0].title,
+      pdf_files: pdfFiles,
+      excel_files: excelFiles,
+      // Add other report details as needed
+    };
+
+    res.status(200).json(report);
+  } catch (error) {
+    console.error("Error fetching user report:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};

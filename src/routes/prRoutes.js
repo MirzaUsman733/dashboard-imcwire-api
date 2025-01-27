@@ -103,4 +103,11 @@ router.get(
   prController.getSinglePRDetails
 );
 
+router.put(
+  "/superadmin/update-single-pr/:single_pr_id",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prController.updatePRStatusBySuperAdmin
+);
+
 module.exports = router;

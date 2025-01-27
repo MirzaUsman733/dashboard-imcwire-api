@@ -422,6 +422,7 @@ exports.updateSinglePR = async (req, res) => {
 exports.getSinglePRs = async (req, res) => {
   const { pr_id } = req.params
   const user_id = req.user.id
+  console.log(user_id, pr_id)
   let dbConnection
 
   if (!pr_id) {
@@ -850,3 +851,54 @@ exports.getSinglePRDetailsAdmin = async (req, res) => {
   }
 }
 
+
+
+
+exports.updatePRStatusBySuperAdmin = async (req, res) => {
+  let dbConnection;
+  try {
+    const { status } = req.body;
+    const { single_pr_id } = req.params;
+
+    // Ensure user is superAdmin
+    const user_role = req.user?.role; // Assuming role is accessible in req.user
+    console.log(user_role)
+    if (user_role !== "super_admin") {
+      return res.status(403).json({ message: "Unauthorized access." });
+    }
+
+    dbConnection = await connection.getConnection();
+
+    // Fetch current PR status to check if update is allowed
+    const [existingPR] = await dbConnection.query(
+      "SELECT status FROM single_pr_details WHERE id = ?",
+      [single_pr_id]
+    );
+    if (existingPR.length === 0) {
+      return res.status(404).json({ message: "PR record not found." });
+    }
+
+    const currentStatus = existingPR[0].status;
+
+    // Allow status update only if PR is in allowed states
+    if (!["Not Started", "Pending"].includes(currentStatus)) {
+      return res.status(403).json({ message: "PR status cannot be updated after processing has started." });
+    }
+
+    // Update PR status
+    await dbConnection.query(
+      "UPDATE single_pr_details SET status = ? WHERE id = ?",
+      [status, single_pr_id]
+    );
+
+    res.status(200).json({
+      message: "PR status updated successfully.",
+      pr_id: single_pr_id,
+    });
+  } catch (error) {
+    console.error("Error updating PR status:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
