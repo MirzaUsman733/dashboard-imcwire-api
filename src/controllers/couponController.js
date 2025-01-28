@@ -1,69 +1,81 @@
 const connection = require("../config/dbconfig");
 
-// ✅ **Create a new coupon (Admin Only)**
+// ✅ **Create a new coupon (Admin Only) with Lock Retry Mechanism**
 exports.createCoupon = async (req, res) => {
-  try {
-    const {
-      couponCode,
-      discountPercentage,
-      plan_id,
-      usageLimit,
-      expirationDate,
-    } = req.body;
-
-    if (!couponCode || !discountPercentage) {
-      return res
-        .status(400)
-        .json({ message: "Coupon code and discount percentage are required" });
-    }
-
-    const dbConnection = await connection.getConnection();
-    await dbConnection.beginTransaction();
-
-    // ✅ **Check if `plan_id` exists in `plan_data`**
-    if (plan_id) {
-      const [planCheck] = await dbConnection.query(
-        "SELECT id FROM plan_items WHERE id = ?",
-        [plan_id]
-      );
-
-      if (planCheck.length === 0) {
-        await dbConnection.rollback();
-        return res
-          .status(404)
-          .json({ message: "Plan not found. Please provide a valid plan_id." });
-      }
-    }
-
-    // ✅ **Insert Coupon**
-    const [result] = await dbConnection.query(
-      "INSERT INTO coupons (couponCode, discountPercentage, plan_id, usageLimit, expirationDate) VALUES (?, ?, ?, ?, ?)",
-      [
+  const MAX_RETRIES = 3; // Number of retry attempts
+  let attempt = 0;
+  
+  while (attempt < MAX_RETRIES) {
+    try {
+      const {
         couponCode,
         discountPercentage,
-        plan_id || null,
-        usageLimit || 0,
-        expirationDate || null,
-      ]
-    );
+        plan_id,
+        usageLimit,
+        expirationDate,
+      } = req.body;
 
-    await dbConnection.commit();
-    dbConnection.release();
+      if (!couponCode || !discountPercentage) {
+        return res
+          .status(400)
+          .json({ message: "Coupon code and discount percentage are required" });
+      }
 
-    res.status(201).json({
-      message: "Coupon created successfully",
-      couponId: result.insertId,
-    });
-  } catch (error) {
-    console.error("Error creating coupon:", error);
-    res
-      .status(500)
-      .json({
+      const dbConnection = await connection.getConnection();
+      await dbConnection.beginTransaction();
+
+      // ✅ **Check if `plan_id` exists in `plan_items`**
+      if (plan_id) {
+        const [planCheck] = await dbConnection.query(
+          "SELECT id FROM plan_items WHERE id = ?",
+          [plan_id]
+        );
+
+        if (planCheck.length === 0) {
+          await dbConnection.rollback();
+          return res
+            .status(404)
+            .json({ message: "Plan not found. Please provide a valid plan_id." });
+        }
+      }
+
+      // ✅ **Insert Coupon**
+      const [result] = await dbConnection.query(
+        "INSERT INTO coupons (couponCode, discountPercentage, plan_id, usageLimit, expirationDate) VALUES (?, ?, ?, ?, ?)",
+        [
+          couponCode,
+          discountPercentage,
+          plan_id || null,
+          usageLimit || 0,
+          expirationDate || null,
+        ]
+      );
+
+      await dbConnection.commit();
+      dbConnection.release();
+
+      return res.status(201).json({
+        message: "Coupon created successfully",
+        couponId: result.insertId,
+      });
+
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+
+      if (error.code === 'ER_LOCK_WAIT_TIMEOUT' && attempt < MAX_RETRIES - 1) {
+        console.warn("Retrying transaction due to lock timeout...");
+        attempt++;
+        continue; // Retry transaction
+      }
+
+      return res.status(500).json({
         message: "Internal Server Error",
         error: error.sqlMessage || error.message,
       });
+    }
   }
 };
+
 
 // ✅ **Update an existing coupon (Admin Only)**
 exports.updateCoupon = async (req, res) => {

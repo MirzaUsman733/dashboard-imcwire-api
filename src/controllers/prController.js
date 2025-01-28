@@ -22,7 +22,6 @@ exports.submitSinglePR = async (req, res) => {
     const isFormData = req.headers["content-type"]?.includes(
       "multipart/form-data"
     );
-
     // ✅ Extract Fields
     let { pr_id, company_id, url, tags } = req.body;
     const pdfFile = isFormData ? req.file : null;
@@ -904,7 +903,7 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
 
     // Fetch user email from auth_user table
     const [user] = await dbConnection.query(
-      "SELECT email, username FROM auth_user WHERE id = ?",
+      "SELECT email, username FROM auth_user WHERE auth_user_id = ?",
       [userId]
     );
     if (user.length === 0) {

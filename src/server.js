@@ -13,6 +13,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const faqRoutes = require("./routes/faqRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
+const compression = require("compression");
 
 const app = express();
 
@@ -20,6 +21,17 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use("/v1/webhook", webhookRoutes);
+app.use(
+  compression({
+    filter: (req, res) => {
+      // Disable compression for PR and Report routes
+      if (req.path.startsWith("/v1/pr") || req.path.startsWith("/v1/reports")) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 

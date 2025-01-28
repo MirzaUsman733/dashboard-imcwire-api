@@ -44,21 +44,21 @@ router.delete(
 // ✅ **Super Admin Routes (Super Admin Only)**
 router.get(
   "/superadmin/all",
-  authMiddleware,
+  apiKeyMiddleware,
   SuperAdminAuthMiddleware,
   companyController.getAllCompanies
 );
 
 router.get(
   "/superadmin/user",
-  authMiddleware,
+  apiKeyMiddleware,
   SuperAdminAuthMiddleware,
   companyController.getCompaniesByUserId
 );
 
 router.get(
   "/superadmin/detail",
-  authMiddleware,
+  apiKeyMiddleware,
   SuperAdminAuthMiddleware,
   companyController.getCompanyDetailsById
 );

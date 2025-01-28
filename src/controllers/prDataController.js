@@ -188,16 +188,21 @@ exports.submitPR = async (req, res) => {
     }
 
     const userEmail = userResult[0].email;
-    const username = userResult[0].username;
-    // ✅ 3. Get Total PRs from `plan_items`
-    const [planItem] = await dbConnection.query(
-      "SELECT numberOfPR FROM plan_items WHERE id = ?",
-      [plan_id]
-    );
+    let username = userResult[0].username;
+    username = username.replace(/\d+/g, "").trim(); 
+   // ✅ 2. Check if the plan is activated
+   const [planItem] = await dbConnection.query(
+    "SELECT numberOfPR, activate_plan FROM plan_items WHERE id = ?",
+    [plan_id]
+  );
 
-    if (planItem.length === 0) {
-      return res.status(400).json({ message: "Plan details not found." });
-    }
+  if (planItem.length === 0) {
+    return res.status(400).json({ message: "Plan details not found." });
+  }
+
+  if (planItem[0].activate_plan !== 1) {
+    return res.status(403).json({ message: "The selected plan is not activated yet." });
+  }
 
     const totalPrs = planItem[0].numberOfPR;
 
@@ -290,7 +295,7 @@ exports.submitPR = async (req, res) => {
         cancel_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=false`,
       });
       paymentUrl = session.url;
-    } else if (payment_method === "PayPro") {
+    } else if (payment_method === "Paypro") {
       // PayPro Payment
       const authResponse = await fetch(
         `${process.env.Paypro_URL}/v2/ppro/auth`,
