@@ -877,7 +877,7 @@ exports.getSinglePRDetailsAdmin = async (req, res) => {
 exports.updatePRStatusBySuperAdmin = async (req, res) => {
   let dbConnection;
   try {
-    const { status } = req.body;
+    const { status, pr_id } = req.body;
     const { single_pr_id } = req.params;
 
     // Ensure user is superAdmin
@@ -888,13 +888,16 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
 
     dbConnection = await connection.getConnection();
 
-    // Fetch current PR details to check if update is allowed
+    // Check if the provided pr_id exists in single_pr_details table
     const [existingPR] = await dbConnection.query(
-      "SELECT status, user_id FROM single_pr_details WHERE id = ?",
-      [single_pr_id]
+      "SELECT status, user_id FROM single_pr_details WHERE id = ? AND pr_id = ?",
+      [single_pr_id, pr_id]
     );
     if (existingPR.length === 0) {
-      return res.status(404).json({ message: "PR record not found." });
+      return res.status(400).json({
+        message:
+          "Invalid PR reference. The provided pr_id does not match any existing single_pr_details.",
+      });
     }
 
     const userId = existingPR[0].user_id;
@@ -944,4 +947,3 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
-

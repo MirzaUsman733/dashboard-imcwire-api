@@ -7,6 +7,7 @@ const ftpConfig = {
   port: parseInt(process.env.EXPRESS_FTP_PORT || "21"),
   secure: true,
   secureOptions: { rejectUnauthorized: false },
+  passvTimeout: 30000, 
 };
 
 module.exports = ftpConfig;

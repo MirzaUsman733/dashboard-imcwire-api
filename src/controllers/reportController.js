@@ -5,14 +5,16 @@ const path = require("path");
 const connection = require("../config/dbconfig");
 const ftpConfig = require("../config/ftpConfig");
 const streamifier = require("streamifier");
-
+const nodemailer = require("nodemailer");
 // ✅ Configure Multer for File Uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // ✅ Upload File Directly to FTP
-const uploadToFTP = async (fileBuffer, fileName, folderPath) => {
+const uploadToFTP = async (fileBuffer, fileName, folderPath, retries = 3) => {
   const client = new Client();
+  client.ftp.verbose = true; // Enable logging
+  client.ftp.timeout = 60000; // Increase timeout to 60 seconds
   try {
     await client.access(ftpConfig);
     await client.ensureDir(folderPath);
@@ -20,10 +22,20 @@ const uploadToFTP = async (fileBuffer, fileName, folderPath) => {
     // ✅ Convert buffer to a readable stream
     const stream = streamifier.createReadStream(fileBuffer);
 
-    // ✅ Upload as stream
-    await client.uploadFrom(stream, `${folderPath}/${fileName}`);
-    client.close();
-
+    // ✅ Retry Upload Mechanism
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`FTP Upload Attempt ${attempt}: ${folderPath}/${fileName}`);
+        await client.uploadFrom(stream, `${folderPath}/${fileName}`);
+        console.log(`File uploaded successfully: ${folderPath}/${fileName}`);
+        client.close();
+        return `${folderPath}/${fileName}`; // Return FTP file path
+      } catch (uploadError) {
+        console.error(`FTP Upload Attempt ${attempt} Failed:`, uploadError);
+        if (attempt === retries)
+          throw new Error("FTP Upload Failed after retries");
+      }
+    }
     return `${folderPath}/${fileName}`; // Return FTP file path
   } catch (error) {
     console.error("FTP Upload Error:", error);
@@ -31,7 +43,15 @@ const uploadToFTP = async (fileBuffer, fileName, folderPath) => {
     throw new Error("FTP Upload Failed");
   }
 };
-
+const transporter = nodemailer.createTransport({
+  host: "smtp.hostinger.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "Orders@imcwire.com",
+    pass: "Sales@$$1aShahG!!boy,s",
+  },
+});
 // ✅ Delete Old File from FTP
 const deleteFromFTP = async (filePath) => {
   if (!filePath) return;
@@ -97,7 +117,19 @@ exports.createFullReport = async (req, res) => {
         .status(400)
         .json({ message: "You can only create a report for an Approved PR." });
     }
+    // ✅ Fetch User Details (Name & Email)
+    const [userData] = await dbConnection.query(
+      "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
+      [user_id]
+    );
+    if (userData.length === 0) {
+      return res.status(404).json({ message: "User not found." });
+    }
 
+    console.log(userData);
+    const username = userData[0].username;
+    const userEmail = userData[0].email;
+    console.log(userEmail);
     // ✅ Insert Report
     const [reportResult] = await dbConnection.query(
       "INSERT INTO reports (title, pr_id, single_pr_id, user_id) VALUES (?, ?, ?, ?)",
@@ -170,6 +202,19 @@ exports.createFullReport = async (req, res) => {
       );
     }
 
+    const reportMailOptions = {
+      from: "IMCWire <Orders@imcwire.com>",
+      to: userEmail,
+      subject: "Your Report Has Been Successfully Uploaded - IMCWire",
+      html: `
+        <p>Dear ${username},</p>
+        <p>Your report titled <strong>${title}</strong> has been successfully uploaded.</p>
+        <p>You can check your report in your dashboard.</p>
+        <p>Best Regards,</p>
+        <p>IMCWire Team</p>
+      `,
+    };
+    await transporter.sendMail(reportMailOptions);
     await dbConnection.commit();
 
     res.status(201).json({
@@ -271,7 +316,7 @@ exports.updateFullReport = async (req, res) => {
         [
           report_id,
           prPdfId,
-          pdfFileName,
+          sanitizedPdfName,
           pdfFtpPath.replace("/public_html/files", ""),
         ]
       );

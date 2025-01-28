@@ -41,14 +41,17 @@ exports.registerUser = async (req, res) => {
         "active",
       ]
     );
-
+    // Define expiration time (1 day from now)
+    const expiresInSeconds = 24 * 60 * 60; // 1 day in seconds
+    const expirationTimestamp =
+      Math.floor(Date.now() / 1000) + expiresInSeconds; // Current time + 1 day
     const userId = result[0].insertId;
 
     const token = jwt.sign(
-      { id: userId, email, role, isAgency },
+      { id: userId, email, role, isAgency, expire: expirationTimestamp },
       process.env.JWT_SECRET,
       {
-        expiresIn: "1h",
+        expiresIn: "1d",
       }
     );
     // Send Welcome Email
