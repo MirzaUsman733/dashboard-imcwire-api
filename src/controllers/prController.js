@@ -18,6 +18,9 @@ const transporter = nodemailer.createTransport({
 
 exports.submitSinglePR = async (req, res) => {
   let dbConnection;
+  console.log(req.body)
+  console.log(req.file)
+  console.log(req)
   try {
     const isFormData = req.headers["content-type"]?.includes(
       "multipart/form-data"
@@ -105,10 +108,8 @@ exports.submitSinglePR = async (req, res) => {
       "UPDATE plan_records SET used_prs = used_prs + 1 WHERE user_id = ? AND plan_id = ? AND pr_id = ?",
       [user_id, plan_id, pr_id]
     );
-    console.log(pr_type);
-    console.log(singlePrResult);
     const singlePrId = singlePrResult.insertId;
-    console.log(singlePrId);
+
     // ✅ 6. Handle PR Upload Based on Type
     if (pr_type === "Self-Written") {
       // ✅ Generate Unique File Name
@@ -530,7 +531,7 @@ exports.getSinglePRs = async (req, res) => {
 
 //     // ✅ 1. Verify PR Ownership
 //     const [singlePR] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status,
+//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status,
 //               c.companyName AS company_name, c.websiteUrl AS company_website, c.contactName AS contact_name,
 //               pr.user_id AS pr_owner
 //        FROM single_pr_details sp
@@ -585,7 +586,7 @@ exports.getSinglePRs = async (req, res) => {
 //     dbConnection = await connection.getConnection();
 
 //     const [singlePRs] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status, c.companyName AS company_name
+//       `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name
 //        FROM single_pr_details sp
 //        JOIN companies c ON sp.company_id = c.id`
 //     );
@@ -612,7 +613,7 @@ exports.getSinglePRs = async (req, res) => {
 //     dbConnection = await connection.getConnection();
 
 //     const [singlePRs] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status, c.companyName AS company_name
+//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name
 //        FROM single_pr_details sp
 //        JOIN companies c ON sp.company_id = c.id
 //        WHERE sp.user_id = ?`,
@@ -641,7 +642,7 @@ exports.getSinglePRs = async (req, res) => {
 //     dbConnection = await connection.getConnection();
 
 //     const [singlePRs] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status, c.companyName AS company_name
+//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name
 //        FROM single_pr_details sp
 //        JOIN companies c ON sp.company_id = c.id
 //        WHERE sp.pr_id = ?`,
@@ -697,7 +698,6 @@ exports.getSinglePRs = async (req, res) => {
 // ✅ **Get Single PR Details Including Related Data**
 exports.getSinglePRDetails = async (req, res) => {
   const { single_pr_id } = req.params;
-  const user_id = req.user.id;
   let dbConnection;
 
   if (!single_pr_id) {
@@ -709,7 +709,7 @@ exports.getSinglePRDetails = async (req, res) => {
 
     // ✅ 1. Verify PR Ownership
     const [singlePR] = await dbConnection.query(
-      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status,
+      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status,
               c.companyName AS company_name, c.websiteUrl AS company_website, c.contactName AS contact_name,
               pr.user_id AS pr_owner
        FROM single_pr_details sp
@@ -724,13 +724,6 @@ exports.getSinglePRDetails = async (req, res) => {
     }
 
     const prDetail = singlePR[0];
-
-    // ✅ 2. Check if PR belongs to the authenticated user
-    if (prDetail.pr_owner !== user_id) {
-      return res.status(403).json({
-        message: "Unauthorized: This Single PR does not belong to you.",
-      });
-    }
 
     // ✅ 3. Fetch Related Tags for IMCWire Written PRs
     let tags = [];
@@ -761,26 +754,40 @@ exports.getAllSinglePRs = async (req, res) => {
   let dbConnection;
 
   try {
+    // Get database connection
     dbConnection = await connection.getConnection();
 
+    console.log("Database connection established.");
+
+    // Execute query
     const [singlePRs] = await dbConnection.query(
-      `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status, c.companyName AS company_name 
+      `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id_tags_id, sp.status, 
+              c.companyName AS company_name 
        FROM single_pr_details sp
-       JOIN companies c ON sp.company_id = c.id`
+       LEFT JOIN companies c ON sp.company_id = c.id`
     );
 
+    console.log("Query executed successfully. Records found:", singlePRs.length);
+
+    // Send response
     res.status(200).json({
       message: "All Single PRs retrieved successfully.",
       data: singlePRs,
     });
+
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("Error fetching Single PRs:", error);  // Detailed error logging
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+
   } finally {
+    // Release database connection safely
     if (dbConnection) {
       dbConnection.release();
+      console.log("Database connection released.");
     }
   }
 };
+
 
 // ✅ **Superadmin: Get Single PRs by User ID**
 exports.getSinglePRsByUser = async (req, res) => {
@@ -791,7 +798,7 @@ exports.getSinglePRsByUser = async (req, res) => {
     dbConnection = await connection.getConnection();
 
     const [singlePRs] = await dbConnection.query(
-      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status, c.companyName AS company_name 
+      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id_tags_id, sp.status, c.companyName AS company_name 
        FROM single_pr_details sp
        JOIN companies c ON sp.company_id = c.id
        WHERE sp.user_id = ?`,
@@ -820,7 +827,7 @@ exports.getSinglePRsByPRData = async (req, res) => {
     dbConnection = await connection.getConnection();
 
     const [singlePRs] = await dbConnection.query(
-      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_file, sp.url, sp.status, c.companyName AS company_name 
+      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name 
        FROM single_pr_details sp
        JOIN companies c ON sp.company_id = c.id
        WHERE sp.pr_id = ?`,

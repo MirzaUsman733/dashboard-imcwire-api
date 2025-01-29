@@ -6,7 +6,17 @@ const prDataController = require("../controllers/prDataController");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 const multer = require("multer");
+// ✅ Multer Configuration: Only to Parse Form-Data, No Local Storage
+const upload = multer();
 
+// ✅ Middleware to Conditionally Handle `multipart/form-data`
+const checkFileUpload = (req, res, next) => {
+  if (req.headers["content-type"]?.includes("multipart/form-data")) {
+    upload.single("pdf")(req, res, next);
+  } else {
+    next();
+  }
+};
 // ✅ One API to insert all data at once
 router.post(
   "/submit",
@@ -14,6 +24,30 @@ router.post(
   apiKeyMiddleware,
   prDataController.submitPR
 );
+
+// ✅ One API to insert all data at once
+router.post(
+  "/submit-custom-order",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prDataController.submitCustomOrder
+);
+
+// ✅ One API to insert all data at once
+router.get(
+  "/custom-order/:orderId",
+  apiKeyMiddleware,
+  prDataController.getCustomOrder
+);
+
+// ✅ One API to insert all data at once
+router.delete(
+  "/custom-order/:orderId",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prDataController.deleteCustomOrder
+);
+
 router.get(
   "/user-list",
   authMiddleware,
@@ -26,25 +60,6 @@ router.get(
   SuperAdminAuthMiddleware,
   prDataController.getAllPRs
 );
-
-// router.post(
-//   "/submit-single-pr",
-//   authMiddleware,
-//   apiKeyMiddleware,
-//   prController.submitSinglePR
-// );
-
-// ✅ Multer Configuration: Only to Parse Form-Data, No Local Storage
-const upload = multer();
-
-// ✅ Middleware to Conditionally Handle `multipart/form-data`
-const checkFileUpload = (req, res, next) => {
-  if (req.headers["content-type"]?.includes("multipart/form-data")) {
-    upload.single("pdf")(req, res, next);
-  } else {
-    next();
-  }
-};
 
 // ✅ Handle `Self-Written` (File Upload to FTP) & `IMCWire-Written` (JSON Body)
 router.post(

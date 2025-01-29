@@ -473,27 +473,36 @@ exports.superadminUpdateUser = async (req, res) => {
   const { targetUserId, role, status } = req.body;
   const updates = {};
   let statusChanged = false;
+
   try {
+    if (!targetUserId) {
+      return res.status(400).json({ message: "Target user ID is required" });
+    }
+
+    console.log("Updating User:", targetUserId, "Role:", role, "Status:", status);
+
     // Fetch the target user details
     const [targetUsers] = await connection.query(
       "SELECT * FROM auth_user WHERE auth_user_id = ?",
       [targetUserId]
     );
+
     const targetUser = targetUsers[0];
 
     if (!targetUser) {
       return res.status(404).json({ message: "Target user not found" });
     }
 
+    console.log("Target User Details:", targetUser);
+
     // Only allow superadmin to change role and status
     if (role) {
       updates.role = role;
     }
+
     if (
       status &&
-      ["active", "temporary_block", "permanent_block", "deleted"].includes(
-        status
-      )
+      ["active", "temporary_block", "permanent_block", "deleted"].includes(status)
     ) {
       statusChanged = true;
       updates.status = status;
@@ -501,141 +510,129 @@ exports.superadminUpdateUser = async (req, res) => {
 
     // If no valid fields provided, return error
     if (Object.keys(updates).length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No valid fields provided for update" });
+      return res.status(400).json({ message: "No valid fields provided for update" });
     }
 
-    // Update the user in the database
-    const queryParts = [];
-    const values = [];
-
-    Object.keys(updates).forEach((key) => {
-      queryParts.push(`${key} = ?`);
-      values.push(updates[key]);
-    });
-
+    // Construct query dynamically
+    const queryParts = Object.keys(updates).map((key) => `${key} = ?`);
+    const values = Object.values(updates);
     values.push(targetUserId);
 
+    // Update the user in the database
     await connection.query(
       `UPDATE auth_user SET ${queryParts.join(", ")} WHERE auth_user_id = ?`,
       values
     );
 
     // Notify the user if status changes
-    let mailOptions = {};
     if (statusChanged) {
+      const adminEmails = ["imcwirenotifications@gmail.com", "admin@imcwire.com"];
       let mailOptions = {};
       let adminMailOptions = {};
-      const adminEmails = [
-        "imcwirenotifications@gmail.com",
-        "admin@imcwire.com",
-      ];
 
-      if (status === "permanent_block") {
-        mailOptions = {
-          from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-          to: user.email,
-          subject: "Important Account Notification",
-          html: `
-            <h2>Dear ${user.username},</h2>
-            <p>We regret to inform you that your IMCWire account has been permanently blocked due to violations of our Terms of Service.</p>
-            <h3>Implications:</h3>
-            <ul>
-              <li>Your access to all IMCWire services is revoked immediately.</li>
-              <li>Any subscriptions or services linked to your account are terminated.</li>
-              <li>This decision is final and binding.</li>
-            </ul>
-            <p>If you believe this decision is incorrect, please contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-            <p>Best Regards,<br>IMCWire Support Team</p>
-          `,
-        };
-      } else if (status === "temporary_block") {
-        mailOptions = {
-          from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-          to: user.email,
-          subject: "Temporary Suspension of Your IMCWire Account",
-          html: `
-            <h2>Dear ${user.username},</h2>
-            <p>Your account has been temporarily blocked due to violations of our policies.</p>
-            <h3>Impact of Suspension:</h3>
-            <ul>
-              <li>You cannot access your IMCWire account during the suspension period.</li>
-              <li>Your account will be automatically reinstated after the suspension period.</li>
-            </ul>
-            <p>For more details, please review our <a href="https://imcwire.com/guidelines/">Guidelines</a>.</p>
-            <p>For further questions, contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-            <p>Best Regards,<br>IMCWire Support Team</p>
-          `,
-        };
-      } else if (status === "active") {
-        mailOptions = {
-          from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-          to: user.email,
-          subject: "User Activated on IMCWire Account",
-          html: `
-            <h2>Dear ${user.username},</h2>
-            <p>Your account has been Active.</p>
-            <h3>Impact of Suspension:</h3>
-            <ul>
-              <li>You cannot access your IMCWire account during the suspension period.</li>
-              <li>Your account will be automatically reinstated after the suspension period.</li>
-            </ul>
-            <p>For more details, please review our <a href="https://imcwire.com/guidelines/">Guidelines</a>.</p>
-            <p>For further questions, contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-            <p>Best Regards,<br>IMCWire Support Team</p>
-          `,
-        };
-      } else if (status === "delete") {
-        mailOptions = {
-          from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-          to: user.email,
-          subject: "Delete User From the IMCWire Account",
-          html: `
-            <h2>Dear ${user.username},</h2>
-            <p>Your account has been Active.</p>
-            <h3>Impact of Suspension:</h3>
-            <ul>
-              <li>You cannot access your IMCWire account during the suspension period.</li>
-              <li>Your account will be automatically reinstated after the suspension period.</li>
-            </ul>
-            <p>For more details, please review our <a href="https://imcwire.com/guidelines/">Guidelines</a>.</p>
-            <p>For further questions, contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-            <p>Best Regards,<br>IMCWire Support Team</p>
-          `,
-        };
+      // Construct user notification email
+      switch (status) {
+        case "permanent_block":
+          mailOptions = {
+            from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+            to: targetUser.email,
+            subject: "Important Account Notification",
+            html: `
+              <h2>Dear ${targetUser.username},</h2>
+              <p>We regret to inform you that your IMCWire account has been permanently blocked due to violations of our Terms of Service.</p>
+              <h3>Implications:</h3>
+              <ul>
+                <li>Your access to all IMCWire services is revoked immediately.</li>
+                <li>Any subscriptions or services linked to your account are terminated.</li>
+                <li>This decision is final and binding.</li>
+              </ul>
+              <p>If you believe this decision is incorrect, please contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
+              <p>Best Regards,<br>IMCWire Support Team</p>
+            `,
+          };
+          break;
+
+        case "temporary_block":
+          mailOptions = {
+            from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+            to: targetUser.email,
+            subject: "Temporary Suspension of Your IMCWire Account",
+            html: `
+              <h2>Dear ${targetUser.username},</h2>
+              <p>Your account has been temporarily blocked due to violations of our policies.</p>
+              <h3>Impact of Suspension:</h3>
+              <ul>
+                <li>You cannot access your IMCWire account during the suspension period.</li>
+                <li>Your account will be automatically reinstated after the suspension period.</li>
+              </ul>
+              <p>For more details, please review our <a href="https://imcwire.com/guidelines/">Guidelines</a>.</p>
+              <p>For further questions, contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
+              <p>Best Regards,<br>IMCWire Support Team</p>
+            `,
+          };
+          break;
+
+        case "active":
+          mailOptions = {
+            from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+            to: targetUser.email,
+            subject: "User Activated on IMCWire Account",
+            html: `
+              <h2>Dear ${targetUser.username},</h2>
+              <p>Your account has been reactivated successfully.</p>
+              <p>You can now access all services again.</p>
+              <p>Best Regards,<br>IMCWire Support Team</p>
+            `,
+          };
+          break;
+
+        case "deleted":
+          mailOptions = {
+            from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+            to: targetUser.email,
+            subject: "Account Deletion Notification",
+            html: `
+              <h2>Dear ${targetUser.username},</h2>
+              <p>Your IMCWire account has been deleted as per our records.</p>
+              <p>If this was a mistake or you need further assistance, please contact <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
+              <p>Best Regards,<br>IMCWire Support Team</p>
+            `,
+          };
+          break;
       }
 
-      // Notify Admins
+      // Construct admin notification email
       adminMailOptions = {
         from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-        to: adminEmails.join(","), // Send to multiple admins
+        to: adminEmails.join(","),
         subject: "Account Status Update",
         html: `
           <h3>Account Status Update</h3>
           <p>Dear Admins,</p>
-          <p>The account status of user ${user.username} (${user.email}) has been updated.</p>
+          <p>The account status of user <strong>${targetUser.username}</strong> (<a href="mailto:${targetUser.email}">${targetUser.email}</a>) has been updated.</p>
           <ul>
-            <li>User ID: ${user.auth_user_id}</li>
-            <li>New Status: ${status}</li>
+            <li><strong>User ID:</strong> ${targetUser.auth_user_id}</li>
+            <li><strong>New Status:</strong> ${status}</li>
           </ul>
           <p>Please take necessary actions as per the updated status.</p>
         `,
       };
 
-      // Send Emails
+      // Send notification emails
       await transporter.sendMail(mailOptions);
       await transporter.sendMail(adminMailOptions);
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "User role/status updated successfully",
       updates,
     });
   } catch (error) {
-    res.status(500).json({ error: "Error updating user role/status" });
+    console.error("Error updating user role/status:", error);
+    return res.status(500).json({ error: "Error updating user role/status" });
   }
 };
+
 
 // ✅ Add User Profile API
 exports.addUserProfile = async (req, res) => {

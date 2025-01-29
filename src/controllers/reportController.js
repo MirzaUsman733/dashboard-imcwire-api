@@ -69,6 +69,7 @@ const deleteFromFTP = async (filePath) => {
 // ✅ Create Report and Upload Files in One API (Ensuring Ownership & One Report per `single_pr_id`)
 exports.createFullReport = async (req, res) => {
   let dbConnection;
+  
   try {
     const { pr_id, single_pr_id, title, user_id } = req.body;
     const pdfFile = req.files["pdf"] ? req.files["pdf"][0] : null;
@@ -138,7 +139,9 @@ exports.createFullReport = async (req, res) => {
     const reportId = reportResult.insertId;
 
     const ftpFolderPath = `/public_html/files/uploads/reports`;
-
+  // ✅ Declare the paths outside the conditions
+  let pdfFtpPath = "";
+  let excelFtpPath = "";
     if (pdfFile) {
       // ✅ Handle PDF Upload Directly to FTP
       const pdfUniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
@@ -147,7 +150,7 @@ exports.createFullReport = async (req, res) => {
         "-"
       );
       const pdfFileName = `${pdfUniqueId}_${sanitizedPdfName}`;
-      const pdfFtpPath = await uploadToFTP(
+      pdfFtpPath = await uploadToFTP(
         pdfFile.buffer,
         pdfFileName,
         ftpFolderPath
@@ -185,7 +188,7 @@ exports.createFullReport = async (req, res) => {
         "-"
       );
       const excelFileName = `${excelUniqueId}_${sanitizedExcelName}`;
-      const excelFtpPath = await uploadToFTP(
+      excelFtpPath = await uploadToFTP(
         excelFile.buffer,
         excelFileName,
         ftpFolderPath
@@ -201,17 +204,94 @@ exports.createFullReport = async (req, res) => {
         ]
       );
     }
-
+    // ✅ Update `single_pr_details` status to "Report Created"
+    await dbConnection.query(
+      "UPDATE single_pr_details SET status = 'Published' WHERE id = ?",
+      [single_pr_id]
+    );
     const reportMailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
       to: userEmail,
       subject: "Your Report Has Been Successfully Uploaded - IMCWire",
       html: `
-        <p>Dear ${username},</p>
-        <p>Your report titled <strong>${title}</strong> has been successfully uploaded.</p>
-        <p>You can check your report in your dashboard.</p>
+       <!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Report Upload Confirmation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            max-width: 600px;
+            margin: 20px auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: #004085;
+            color: #ffffff;
+            text-align: center;
+            padding: 10px;
+            font-size: 20px;
+            border-radius: 8px 8px 0 0;
+        }
+        .content {
+            padding: 20px;
+            line-height: 1.6;
+            color: #333333;
+        }
+        .footer {
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+            color: #777777;
+        }
+        .button {
+            display: inline-block;
+            background: #004085;
+            color: #ffffff;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        Report Successfully Uploaded
+    </div>
+    <div class="content">
+        <p>Dear <strong>${username}</strong>,</p>
+        <p>Your report titled <strong>${title}</strong> has been successfully uploaded and published under PR Number.</p>
+        <p>You can check the details of your report in your dashboard.</p>
+        <p>Additionally, you can download the published report in the following formats:</p>
+        <p>
+             <a href="${pdfFtpPath.replace("/public_html/files", "")}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+             <a href="${excelFtpPath.replace("/public_html/files", "")}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+        </p>
+        <p>If you have any questions, feel free to contact our support team.</p>
         <p>Best Regards,</p>
-        <p>IMCWire Team</p>
+        <p><strong>IMCWire Team</strong></p>
+    </div>
+    <div class="footer">
+        &copy; 2025 IMCWire. All rights reserved.
+    </div>
+</div>
+
+</body>
+</html>
+
       `,
     };
     await transporter.sendMail(reportMailOptions);
@@ -389,6 +469,7 @@ exports.getUserReport = async (req, res) => {
   try {
     const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
     const { report_id } = req.params;
+    console.log(report_id)
     console.log(user_id);
     dbConnection = await connection.getConnection();
 
@@ -404,7 +485,6 @@ exports.getUserReport = async (req, res) => {
       });
     }
 
-    // ✅ Fetch PDF and Excel Files (if needed)
 
     // Example: Fetch PDF files linked to this report
     const [pdfFiles] = await dbConnection.query(
@@ -430,6 +510,57 @@ exports.getUserReport = async (req, res) => {
     res.status(200).json(report);
   } catch (error) {
     console.error("Error fetching user report:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
+
+// ✅ Get All Reports for a Specific User
+exports.getAllUserReports = async (req, res) => {
+  let dbConnection;
+  try {
+    const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
+    dbConnection = await connection.getConnection();
+
+    // ✅ Fetch All Reports for the User
+    const [reports] = await dbConnection.query(
+      "SELECT * FROM reports WHERE user_id = ?",
+      [user_id]
+    );
+
+    if (reports.length === 0) {
+      return res.status(404).json({
+        message: "No reports found for this user.",
+      });
+    }
+
+    // ✅ Fetch PDF and Excel Files for Each Report (if needed)
+    const reportsWithFiles = await Promise.all(
+      reports.map(async (report) => {
+        const [pdfFiles] = await dbConnection.query(
+          "SELECT pdf_name, pdf_url FROM report_pr_pdfs WHERE report_id = ?",
+          [report.id]
+        );
+
+        const [excelFiles] = await dbConnection.query(
+          "SELECT excel_name, excel_url FROM report_excel_files WHERE report_id = ?",
+          [report.id]
+        );
+
+        return {
+          id: report.id,
+          title: report.title,
+          pdf_files: pdfFiles,
+          excel_files: excelFiles,
+          // Add other report details as needed
+        };
+      })
+    );
+
+    res.status(200).json(reportsWithFiles);
+  } catch (error) {
+    console.error("Error fetching user reports:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();

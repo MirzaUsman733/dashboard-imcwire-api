@@ -13,6 +13,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const faqRoutes = require("./routes/faqRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
+const howItWorksRoutes = require("./routes/howItWorksRoutes");
 const compression = require("compression");
 
 const app = express();
@@ -45,6 +46,7 @@ app.use("/v1/company", companyRoutes);
 app.use("/v1/coupon", couponRoutes);
 app.use("/v1/faq", faqRoutes);
 app.use("/v1/reports", reportRoutes);
+app.use("/v1/how-it-works", howItWorksRoutes);
 // app.use("/v1/files", fileRoutes);
 
 const PORT = process.env.PORT || 3008;

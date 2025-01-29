@@ -81,15 +81,15 @@ exports.handleStripeWebhook = async (req, res) => {
           from: "IMCWire <Orders@imcwire.com>",
           to: receiptEmail,
           subject: `Your Payment Has Been Successfully Processed - Transaction ${clientReferenceId}`,
-        //   html: `
-        //       <p>Dear Customer,</p>
-        //       <p>Your payment of <strong>$${amountPaid} ${currency.toUpperCase()}</strong> has been successfully processed.</p>
-        //       <p>Your PR status has been updated to <strong>Paid</strong>. You can now access your PR dashboard.</p>
-        //       <p>Thank you for choosing IMCWire!</p>
-        //       <p>Best Regards,<br>IMCWire Team</p>
-        //     `,
-        // };
-        html: `
+          //   html: `
+          //       <p>Dear Customer,</p>
+          //       <p>Your payment of <strong>$${amountPaid} ${currency.toUpperCase()}</strong> has been successfully processed.</p>
+          //       <p>Your PR status has been updated to <strong>Paid</strong>. You can now access your PR dashboard.</p>
+          //       <p>Thank you for choosing IMCWire!</p>
+          //       <p>Best Regards,<br>IMCWire Team</p>
+          //     `,
+          // };
+          html: `
         <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -130,7 +130,7 @@ exports.handleStripeWebhook = async (req, res) => {
           </body>
           </html>
       `,
-  };
+        };
         await transporter.sendMail(mailOptions);
 
         // ✅ Send Email to Admin

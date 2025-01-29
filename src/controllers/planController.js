@@ -43,7 +43,17 @@ exports.createPlan = async (req, res) => {
 // Update an existing plan (Admin Only)
 exports.updatePlan = async (req, res) => {
   try {
-    const { id, planName, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type } = req.body;
+    const {
+      id,
+      planName,
+      totalPlanPrice,
+      priceSingle,
+      planDescription,
+      pdfLink,
+      numberOfPR,
+      activate_plan,
+      type,
+    } = req.body;
 
     if (!id) {
       return res.status(400).json({ message: "Plan ID is required" });
@@ -98,10 +108,11 @@ exports.updatePlan = async (req, res) => {
 
     res.status(200).json({ message: "Plan updated successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 
 // Get all plans (with optional filtering by type)
 exports.getPlans = async (req, res) => {
@@ -123,10 +134,11 @@ exports.getPlans = async (req, res) => {
 
     res.status(200).json(plans);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 
 // Delete a plan (Admin Only)
 exports.deletePlan = async (req, res) => {

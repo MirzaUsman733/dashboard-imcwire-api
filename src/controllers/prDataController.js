@@ -2,148 +2,6 @@ const connection = require("../config/dbconfig");
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
-// exports.submitPR = async (req, res) => {
-//   const {
-//     client_id,
-//     plan_id,
-//     prType,
-//     pr_status,
-//     payment_method,
-//     targetCountries, // Array of { name, price, translationRequired }
-//     industryCategories, // Array of { name, price }
-//     total_price,
-//     payment_status,
-//   } = req.body;
-
-//   if (
-//     !client_id ||
-//     !plan_id ||
-//     !prType ||
-//     !payment_method ||
-//     !targetCountries.length ||
-//     !industryCategories.length ||
-//     !total_price ||
-//     !pr_status ||
-//     !payment_status
-//   ) {
-//     return res.status(400).json({ message: "Missing required fields" });
-//   }
-
-//   const connectionPromise = connection.getConnection(); // Get DB connection for transaction
-//   let dbConnection;
-
-//   try {
-//     dbConnection = await connectionPromise;
-//     await dbConnection.beginTransaction(); // Begin Transaction
-
-//     // ✅ 1. Check if Plan Record Exists
-//     let [planRecord] = await dbConnection.query(
-//       "SELECT id FROM plan_records WHERE user_id = ? AND plan_id = ?",
-//       [req.user.id, plan_id]
-//     );
-
-//     if (planRecord.length === 0) {
-//       // ✅ 2. Get Total PRs from `plan_items`
-//       const [planItem] = await dbConnection.query(
-//         "SELECT numberOfPR FROM plan_items WHERE id = ?",
-//         [plan_id]
-//       );
-
-//       if (planItem.length === 0) {
-//         return res.status(400).json({ message: "Plan details not found." });
-//       }
-
-//       const totalPrs = planItem[0].numberOfPR;
-
-//       // ✅ 3. Initialize `plan_records`
-//       const [newPlanRecord] = await dbConnection.query(
-//         "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs) VALUES (?, ?, ?, ?)",
-//         [req.user.id, plan_id, totalPrs, 0]
-//       );
-
-//       planRecord = [{ id: newPlanRecord.insertId }];
-//     }
-
-//     // ✅ 4. Insert Multiple Target Countries with Individual Translations
-//     let targetCountryIds = [];
-//     for (const country of targetCountries) {
-//       let translationId = null;
-//       if (country.translationRequired) {
-//         const [translationResult] = await dbConnection.query(
-//           "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
-//           [country.translationRequired, country.translationPrice]
-//         );
-
-//         translationId = translationResult.insertId;
-//       }
-
-//       const [targetCountryResult] = await dbConnection.query(
-//         "INSERT INTO target_countries (countryName, countryPrice, translation_required_id) VALUES (?, ?, ?)",
-//         [country.name, country.price, translationId]
-//       );
-//       targetCountryIds.push(targetCountryResult.insertId);
-//     }
-
-//     // ✅ 5. Insert Multiple Industry Categories
-//     let industryCategoryIds = [];
-//     for (const category of industryCategories) {
-//       const [industryCategoryResult] = await dbConnection.query(
-//         "INSERT INTO industry_categories (categoryName, categoryPrice) VALUES (?, ?)",
-//         [category.name, category.price]
-//       );
-//       industryCategoryIds.push(industryCategoryResult.insertId);
-//     }
-
-//     // ✅ 6. Insert PR Data
-//     const [prResult] = await dbConnection.query(
-//       "INSERT INTO pr_data (client_id, user_id, plan_id, prType, pr_status, payment_method, total_price, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-//       [
-//         client_id,
-//         req.user.id,
-//         plan_id,
-//         prType,
-//         pr_status,
-//         payment_method,
-//         total_price,
-//         payment_status,
-//       ]
-//     );
-//     const prId = prResult.insertId;
-
-//     // ✅ 7. Link PR to Multiple Target Countries
-//     for (const countryId of targetCountryIds) {
-//       await dbConnection.query(
-//         "INSERT INTO pr_target_countries (pr_id, target_country_id) VALUES (?, ?)",
-//         [prId, countryId]
-//       );
-//     }
-
-//     // ✅ 8. Link PR to Multiple Industry Categories
-//     for (const categoryId of industryCategoryIds) {
-//       await dbConnection.query(
-//         "INSERT INTO pr_industry_categories (pr_id, target_industry_id) VALUES (?, ?)",
-//         [prId, categoryId]
-//       );
-//     }
-
-//     await dbConnection.commit(); // Commit Transaction
-
-//     res.status(201).json({
-//       message: "PR submitted successfully",
-//     });
-//   } catch (error) {
-//     if (dbConnection) {
-//       await dbConnection.rollback();
-//     }
-//     res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (dbConnection) {
-//       dbConnection.release();
-//     }
-//   }
-// };
-
-// ✅ **Submit PR & Initialize Plan Records if Not Exists**
 exports.submitPR = async (req, res) => {
   const {
     client_id,
@@ -151,8 +9,8 @@ exports.submitPR = async (req, res) => {
     prType,
     pr_status,
     payment_method,
-    targetCountries, // Array of { name, price, translationRequired }
-    industryCategories, // Array of { name, price }
+    targetCountries,
+    industryCategories,
     total_price,
     payment_status,
   } = req.body;
@@ -189,20 +47,22 @@ exports.submitPR = async (req, res) => {
 
     const userEmail = userResult[0].email;
     let username = userResult[0].username;
-    username = username.replace(/\d+/g, "").trim(); 
-   // ✅ 2. Check if the plan is activated
-   const [planItem] = await dbConnection.query(
-    "SELECT numberOfPR, activate_plan FROM plan_items WHERE id = ?",
-    [plan_id]
-  );
+    username = username.replace(/\d+/g, "").trim();
+    // ✅ 2. Check if the plan is activated
+    const [planItem] = await dbConnection.query(
+      "SELECT numberOfPR, activate_plan FROM plan_items WHERE id = ?",
+      [plan_id]
+    );
 
-  if (planItem.length === 0) {
-    return res.status(400).json({ message: "Plan details not found." });
-  }
+    if (planItem.length === 0) {
+      return res.status(400).json({ message: "Plan details not found." });
+    }
 
-  if (planItem[0].activate_plan !== 1) {
-    return res.status(403).json({ message: "The selected plan is not activated yet." });
-  }
+    if (planItem[0].activate_plan !== 1) {
+      return res
+        .status(403)
+        .json({ message: "The selected plan is not activated yet." });
+    }
 
     const totalPrs = planItem[0].numberOfPR;
 
@@ -212,8 +72,8 @@ exports.submitPR = async (req, res) => {
       let translationId = null;
       if (country.translationRequired) {
         const [translationResult] = await dbConnection.query(
-          "INSERT INTO translation_required (translation) VALUES (?)",
-          [country.translationRequired]
+          "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
+          [country.translationRequired, country.translationPrice]
         );
 
         translationId = translationResult.insertId;
@@ -464,5 +324,281 @@ exports.getAllPRs = async (req, res) => {
     res.status(200).json(prData);
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+exports.submitCustomOrder = async (req, res) => {
+  const {
+    orderId,
+    client_id,
+    plan_id,
+    orderType,
+    targetCountries,
+    industryCategories,
+    total_price,
+    payment_status,
+    payment_method,
+  } = req.body;
+
+  if (
+    !client_id ||
+    !plan_id ||
+    !orderType ||
+    !payment_method ||
+    !targetCountries.length ||
+    !industryCategories.length ||
+    !total_price ||
+    !payment_status
+  ) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  let dbConnection;
+
+  try {
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction(); // Begin Transaction
+
+    // ✅ 1. Store Order Details Without Linking to a User
+    const [orderResult] = await dbConnection.query(
+      "INSERT INTO custom_orders (orderId, client_id, plan_id, orderType, total_price, payment_status, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+      [
+        orderId,
+        client_id,
+        plan_id,
+        orderType,
+        total_price,
+        payment_status,
+        payment_method,
+      ]
+    );
+    const customOrderId = orderResult.insertId;
+
+    // ✅ 2. Insert Target Countries with Translations
+    let targetCountryIds = [];
+    for (const country of targetCountries) {
+      let translationId = null;
+      if (country.translationRequired) {
+        const [translationResult] = await dbConnection.query(
+          "INSERT INTO translation_required (translation) VALUES (?)",
+          [country.translationRequired]
+        );
+        translationId = translationResult.insertId;
+      }
+
+      const [targetCountryResult] = await dbConnection.query(
+        "INSERT INTO target_countries (countryName, countryPrice, translation_required_id) VALUES (?, ?, ?)",
+        [country.name, country.price, translationId]
+      );
+      targetCountryIds.push(targetCountryResult.insertId);
+    }
+
+    // ✅ 3. Insert Industry Categories for the Order
+    let industryCategoryIds = [];
+    for (const category of industryCategories) {
+      const [industryCategoryResult] = await dbConnection.query(
+        "INSERT INTO industry_categories (categoryName, categoryPrice) VALUES (?, ?)",
+        [category.name, category.price]
+      );
+      industryCategoryIds.push(industryCategoryResult.insertId);
+    }
+
+    // ✅ 4. Link Order to Target Countries
+    for (const countryId of targetCountryIds) {
+      await dbConnection.query(
+        "INSERT INTO custom_order_target_countries (order_id, target_country_id) VALUES (?, ?)",
+        [customOrderId, countryId]
+      );
+    }
+
+    // ✅ 5. Link Order to Industry Categories
+    for (const categoryId of industryCategoryIds) {
+      await dbConnection.query(
+        "INSERT INTO custom_order_industry_categories (order_id, industry_category_id) VALUES (?, ?)",
+        [customOrderId, categoryId]
+      );
+    }
+
+    // ✅ 6. Generate Invoice URL (User Will Provide Details Later)
+    const invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${customOrderId}`;
+
+    await dbConnection.commit();
+    res
+      .status(201)
+      .json({ message: "Custom order submitted successfully", invoiceUrl });
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback();
+    console.error("Error in submitCustomOrder:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
+
+exports.getCustomOrder = async (req, res) => {
+  const { orderId } = req.params;
+  console.log(orderId);
+  if (!orderId) {
+    return res.status(400).json({ message: "Order ID is required" });
+  }
+
+  let dbConnection;
+
+  try {
+    dbConnection = await connection.getConnection();
+
+    // ✅ 1. Fetch Custom Order Data
+    const [orderResult] = await dbConnection.query(
+      "SELECT * FROM custom_orders WHERE id = ?",
+      [orderId]
+    );
+
+    if (orderResult.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const customOrder = orderResult[0];
+
+    // ✅ 2. Fetch Target Countries Linked to Order
+    const [targetCountries] = await dbConnection.query(
+      `SELECT tc.id, tc.countryName, tc.countryPrice
+       FROM custom_order_target_countries cotc
+       JOIN target_countries tc ON cotc.target_country_id = tc.id
+       WHERE cotc.order_id = ?`,
+      [customOrder.id]
+    );
+
+    // ✅ 3. Fetch Industry Categories Linked to Order
+    const [industryCategories] = await dbConnection.query(
+      `SELECT ic.id, ic.categoryName, ic.categoryPrice
+       FROM custom_order_industry_categories coic
+       JOIN industry_categories ic ON coic.industry_category_id = ic.id
+       WHERE coic.order_id = ?`,
+      [customOrder.id]
+    );
+
+    // ✅ 4. Build Response
+    const response = {
+      orderId: customOrder.orderId,
+      client_id: customOrder.client_id,
+      plan_id: customOrder.plan_id,
+      orderType: customOrder.orderType,
+      total_price: customOrder.total_price,
+      payment_status: customOrder.payment_status,
+      payment_method: customOrder.payment_method,
+      created_at: customOrder.created_at,
+      targetCountries,
+      industryCategories,
+      invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.id}`,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error("Error in getCustomOrder:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
+
+exports.deleteCustomOrder = async (req, res) => {
+  const { orderId } = req.params;
+
+  if (!orderId) {
+    return res.status(400).json({ message: "Order ID is required" });
+  }
+
+  let dbConnection;
+
+  try {
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction(); // Begin transaction
+
+    // ✅ 1. Fetch Custom Order to Ensure It Exists
+    const [orderResult] = await dbConnection.query(
+      "SELECT id FROM custom_orders WHERE id = ?",
+      [orderId]
+    );
+
+    if (orderResult.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const customOrderId = orderResult[0].id;
+
+    // ✅ 2. Fetch Target Countries Linked to This Order
+    const [targetCountryIds] = await dbConnection.query(
+      "SELECT target_country_id FROM custom_order_target_countries WHERE order_id = ?",
+      [customOrderId]
+    );
+
+    // ✅ 3. Fetch Industry Categories Linked to This Order
+    const [industryCategoryIds] = await dbConnection.query(
+      "SELECT industry_category_id FROM custom_order_industry_categories WHERE order_id = ?",
+      [customOrderId]
+    );
+
+    // ✅ 4. Delete Linked Target Countries from Mapping Table
+    await dbConnection.query(
+      "DELETE FROM custom_order_target_countries WHERE order_id = ?",
+      [customOrderId]
+    );
+
+    // ✅ 5. Delete Linked Industry Categories from Mapping Table
+    await dbConnection.query(
+      "DELETE FROM custom_order_industry_categories WHERE order_id = ?",
+      [customOrderId]
+    );
+
+    // ✅ 6. Delete Unused Target Countries (if not linked to any other orders or PRs)
+    for (const { target_country_id } of targetCountryIds) {
+      const [remainingLinks] = await dbConnection.query(
+        "SELECT COUNT(*) as count FROM (SELECT target_country_id FROM custom_order_target_countries WHERE target_country_id = ? UNION ALL SELECT target_country_id FROM pr_target_countries WHERE target_country_id = ?) AS links",
+        [target_country_id, target_country_id]
+      );
+      if (remainingLinks[0].count === 0) {
+        await dbConnection.query("DELETE FROM target_countries WHERE id = ?", [
+          target_country_id,
+        ]);
+      }
+    }
+
+    // ✅ 7. Delete Unused Industry Categories (if not linked to any other orders or PRs)
+    for (const { industry_category_id } of industryCategoryIds) {
+      const [remainingLinks] = await dbConnection.query(
+        "SELECT COUNT(*) as count FROM (SELECT industry_category_id FROM custom_order_industry_categories WHERE industry_category_id = ? UNION ALL SELECT target_industry_id FROM pr_industry_categories WHERE target_industry_id = ?) AS links",
+        [industry_category_id, industry_category_id]
+      );
+      if (remainingLinks[0].count === 0) {
+        await dbConnection.query(
+          "DELETE FROM industry_categories WHERE id = ?",
+          [industry_category_id]
+        );
+      }
+    }
+
+    // ✅ 8. Delete the Custom Order
+    await dbConnection.query("DELETE FROM custom_orders WHERE id = ?", [
+      customOrderId,
+    ]);
+
+    await dbConnection.commit();
+    res
+      .status(200)
+      .json({
+        message: "Custom order and associated data deleted successfully",
+      });
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback();
+    console.error("Error in deleteCustomOrder:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release();
   }
 };

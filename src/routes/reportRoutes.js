@@ -30,4 +30,12 @@ router.get(
   reportController.getUserReport
 );
 
+// ✅ Create Report + Upload PDF & Excel in One API
+router.get(
+  "/get-user-pr-reports",
+  apiKeyMiddleware,
+  authMiddleware,
+  reportController.getAllUserReports
+);
+
 module.exports = router;
