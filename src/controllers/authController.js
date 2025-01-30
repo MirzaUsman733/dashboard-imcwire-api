@@ -51,7 +51,7 @@ exports.registerUser = async (req, res) => {
       { id: userId, email, role, isAgency, expire: expirationTimestamp },
       process.env.JWT_SECRET,
       {
-        expiresIn: "1d",
+        expiresIn: "7d",
       }
     );
     // Send Welcome Email
@@ -192,7 +192,7 @@ exports.loginUser = async (req, res) => {
         isAgency: user.isAgency,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }
     );
     // Store login history
     await connection.query(
@@ -479,7 +479,14 @@ exports.superadminUpdateUser = async (req, res) => {
       return res.status(400).json({ message: "Target user ID is required" });
     }
 
-    console.log("Updating User:", targetUserId, "Role:", role, "Status:", status);
+    console.log(
+      "Updating User:",
+      targetUserId,
+      "Role:",
+      role,
+      "Status:",
+      status
+    );
 
     // Fetch the target user details
     const [targetUsers] = await connection.query(
@@ -502,7 +509,9 @@ exports.superadminUpdateUser = async (req, res) => {
 
     if (
       status &&
-      ["active", "temporary_block", "permanent_block", "deleted"].includes(status)
+      ["active", "temporary_block", "permanent_block", "deleted"].includes(
+        status
+      )
     ) {
       statusChanged = true;
       updates.status = status;
@@ -510,7 +519,9 @@ exports.superadminUpdateUser = async (req, res) => {
 
     // If no valid fields provided, return error
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: "No valid fields provided for update" });
+      return res
+        .status(400)
+        .json({ message: "No valid fields provided for update" });
     }
 
     // Construct query dynamically
@@ -526,7 +537,10 @@ exports.superadminUpdateUser = async (req, res) => {
 
     // Notify the user if status changes
     if (statusChanged) {
-      const adminEmails = ["imcwirenotifications@gmail.com", "admin@imcwire.com"];
+      const adminEmails = [
+        "imcwirenotifications@gmail.com",
+        "admin@imcwire.com",
+      ];
       let mailOptions = {};
       let adminMailOptions = {};
 
@@ -633,7 +647,6 @@ exports.superadminUpdateUser = async (req, res) => {
   }
 };
 
-
 // ✅ Add User Profile API
 exports.addUserProfile = async (req, res) => {
   const { id } = req.user;
@@ -722,7 +735,6 @@ exports.getUserProfile = async (req, res) => {
 
 // ✅ SuperAdmin - Get All Users API
 exports.getAllUsers = async (req, res) => {
-
   try {
     // Fetch all users from auth_user table
     const [users] = await connection.query(
@@ -752,7 +764,9 @@ exports.getAllUsers = async (req, res) => {
       profile: profileMap[user.auth_user_id] || null, // Attach profile if exists
     }));
 
-    res.status(200).json({ message: "Users retrieved successfully", users: allUsers });
+    res
+      .status(200)
+      .json({ message: "Users retrieved successfully", users: allUsers });
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ error: "Error fetching users" });
@@ -764,8 +778,6 @@ exports.getSingleUserProfile = async (req, res) => {
   const { userId } = req.params; // Extract user ID from request params
 
   try {
-    
-
     // Fetch user info from auth_user
     const [userResults] = await connection.query(
       "SELECT auth_user_id, username, email, role, isAgency, status, created_at FROM auth_user WHERE auth_user_id = ?",

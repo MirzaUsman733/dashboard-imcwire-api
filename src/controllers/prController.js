@@ -434,7 +434,6 @@ exports.updateSinglePR = async (req, res) => {
   }
 };
 
-// ✅ **Get All Single PRs Related to a Specific PR Data Entry**
 // ✅ **Get All Single PRs Related to a Specific PR Data Entry with Detailed Information**
 exports.getSinglePRs = async (req, res) => {
   const { pr_id } = req.params;
@@ -515,185 +514,118 @@ exports.getSinglePRs = async (req, res) => {
     }
   }
 };
+// ✅ **Get All Single PRs Related to the Authenticated User with Detailed Information**
+exports.getUserSinglePRs = async (req, res) => {
+  const user_id = req.user.id; // Extract user ID from authenticated request
+  let dbConnection;
 
-// // ✅ **Get Single PR Details Including Related Data**
-// exports.getSinglePRDetails = async (req, res) => {
-//   const { single_pr_id } = req.params;
-//   const user_id = req.user.id;
-//   let dbConnection;
+  try {
+    dbConnection = await connection.getConnection();
+    console.log(`Fetching all single PRs for user ID: ${user_id}`);
 
-//   if (!single_pr_id) {
-//     return res.status(400).json({ message: "Missing required Single PR ID." });
-//   }
+    // ✅ 1. Retrieve all Single PRs that belong to the authenticated user
+    const [singlePRs] = await dbConnection.query(
+      `SELECT 
+        sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.status,
+        c.companyName AS company_name, c.websiteUrl AS company_website, c.contactName AS contact_name,
+        pdf.unique_id AS pdf_unique_id, pdf.pdf_file AS pdf_filename, pdf.url AS pdf_url,
+        ut.url AS pr_url
+      FROM single_pr_details sp
+      JOIN companies c ON sp.company_id = c.id
+      LEFT JOIN pr_pdf_files pdf ON sp.id = pdf.single_pr_id
+      LEFT JOIN pr_url_tags ut ON sp.id = ut.single_pr_id
+      WHERE sp.user_id = ?`, 
+      [user_id]
+    );
 
-//   try {
-//     dbConnection = await connection.getConnection();
+    if (singlePRs.length === 0) {
+      return res.status(404).json({ message: "No single PRs found for this user." });
+    }
 
-//     // ✅ 1. Verify PR Ownership
-//     const [singlePR] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status,
-//               c.companyName AS company_name, c.websiteUrl AS company_website, c.contactName AS contact_name,
-//               pr.user_id AS pr_owner
-//        FROM single_pr_details sp
-//        JOIN pr_data pr ON sp.pr_id = pr.id
-//        JOIN companies c ON sp.company_id = c.id
-//        WHERE sp.id = ?`,
-//       [single_pr_id]
-//     );
+    console.log(`Found ${singlePRs.length} single PRs for user ID: ${user_id}`);
 
-//     if (singlePR.length === 0) {
-//       return res.status(404).json({ message: "Single PR not found." });
-//     }
+    // ✅ 2. Fetch tags for each Single PR (if applicable)
+    const singlePRsWithTags = await Promise.all(
+      singlePRs.map(async (singlePR) => {
+        if (singlePR.pr_type === "IMCWire Written") {
+          const [tags] = await dbConnection.query(
+            `SELECT t.id, t.name 
+          FROM single_pr_tags spt
+          JOIN tags t ON spt.tag_id = t.id
+          WHERE spt.single_pr_id = ?`,
+            [singlePR.id]
+          );
+          return { ...singlePR, tags };
+        }
+        return singlePR;
+      })
+    );
 
-//     const prDetail = singlePR[0];
+    res.status(200).json({
+      message: "Single PRs retrieved successfully.",
+      data: singlePRsWithTags,
+    });
+  } catch (error) {
+    console.error("Error in getUserSinglePRs:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) {
+      dbConnection.release();
+    }
+  }
+};
+// ✅ **Get Single PR Count Based on Status for the Authenticated User**
+exports.getUserPRStatusCounts = async (req, res) => {
+  const user_id = req.user.id; // Extract user ID from authenticated request
+  let dbConnection;
 
-//     // ✅ 2. Check if PR belongs to the authenticated user
-//     if (prDetail.pr_owner !== user_id) {
-//       return res.status(403).json({
-//         message: "Unauthorized: This Single PR does not belong to you.",
-//       });
-//     }
+  try {
+    dbConnection = await connection.getConnection();
+    console.log(`Fetching PR status counts for user ID: ${user_id}`);
 
-//     // ✅ 3. Fetch Related Tags for IMCWire Written PRs
-//     let tags = [];
-//     if (prDetail.pr_type === "IMCWire Written") {
-//       const [tagData] = await dbConnection.query(
-//         `SELECT t.id, t.name FROM single_pr_tags spt
-//          JOIN tags t ON spt.tag_id = t.id
-//          WHERE spt.single_pr_id = ?`,
-//         [single_pr_id]
-//       );
-//       tags = tagData;
-//     }
+    // ✅ Count PRs based on their status for the authenticated user
+    const [statusCounts] = await dbConnection.query(
+      `SELECT 
+        status, COUNT(*) AS count
+      FROM single_pr_details
+      WHERE user_id = ?
+      GROUP BY status`,
+      [user_id]
+    );
 
-//     res.status(200).json({
-//       message: "Single PR details retrieved successfully.",
-//       data: { ...prDetail, tags },
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (dbConnection) {
-//       dbConnection.release();
-//     }
-//   }
-// };
+    // ✅ Format response
+    const statusSummary = {
+      "Not Started": 0,
+      "Pending": 0,
+      "Approved": 0,
+      "In Progress": 0,
+      "Published": 0,
+    };
 
-// exports.getAllSinglePRs = async (req, res) => {
-//   let dbConnection;
+    // ✅ Populate counts dynamically
+    statusCounts.forEach((row) => {
+      statusSummary[row.status] = row.count;
+    });
 
-//   try {
-//     dbConnection = await connection.getConnection();
+    console.log(`PR status counts for user ID ${user_id}:`, statusSummary);
 
-//     const [singlePRs] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name
-//        FROM single_pr_details sp
-//        JOIN companies c ON sp.company_id = c.id`
-//     );
-
-//     res.status(200).json({
-//       message: "All Single PRs retrieved successfully.",
-//       data: singlePRs,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (dbConnection) {
-//       dbConnection.release();
-//     }
-//   }
-// };
-
-// // ✅ **Superadmin: Get Single PRs by User ID**
-// exports.getSinglePRsByUser = async (req, res) => {
-//   const { user_id } = req.params;
-//   let dbConnection;
-
-//   try {
-//     dbConnection = await connection.getConnection();
-
-//     const [singlePRs] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name
-//        FROM single_pr_details sp
-//        JOIN companies c ON sp.company_id = c.id
-//        WHERE sp.user_id = ?`,
-//       [user_id]
-//     );
-
-//     res.status(200).json({
-//       message: "User's Single PRs retrieved successfully.",
-//       data: singlePRs,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (dbConnection) {
-//       dbConnection.release();
-//     }
-//   }
-// };
-
-// // ✅ **Superadmin: Get Single PRs by PR Data ID**
-// exports.getSinglePRsByPRData = async (req, res) => {
-//   const { pr_id } = req.params;
-//   let dbConnection;
-
-//   try {
-//     dbConnection = await connection.getConnection();
-
-//     const [singlePRs] = await dbConnection.query(
-//       `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name
-//        FROM single_pr_details sp
-//        JOIN companies c ON sp.company_id = c.id
-//        WHERE sp.pr_id = ?`,
-//       [pr_id]
-//     );
-
-//     res.status(200).json({
-//       message: "PR Data's Single PRs retrieved successfully.",
-//       data: singlePRs,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (dbConnection) {
-//       dbConnection.release();
-//     }
-//   }
-// };
-
-// // ✅ **Superadmin: Get Single PR Details**
-// exports.getSinglePRDetailsAdmin = async (req, res) => {
-//   const { single_pr_id } = req.params;
-//   let dbConnection;
-
-//   try {
-//     dbConnection = await connection.getConnection();
-
-//     const [singlePR] = await dbConnection.query(
-//       `SELECT sp.*, c.name AS company_name, c.websiteUrl AS company_website, c.contactName AS contactName
-//        FROM single_pr_details sp
-//        JOIN companies c ON sp.company_id = c.id
-//        WHERE sp.id = ?`,
-//       [single_pr_id]
-//     );
-
-//     if (singlePR.length === 0) {
-//       return res.status(404).json({ message: "Single PR not found." });
-//     }
-
-//     res.status(200).json({
-//       message: "Single PR details retrieved successfully.",
-//       data: singlePR[0],
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: "Internal Server Error" });
-//   } finally {
-//     if (dbConnection) {
-//       dbConnection.release();
-//     }
-//   }
-// };
+    res.status(200).json({
+      message: "PR status counts retrieved successfully.",
+      data: statusSummary,
+    });
+  } catch (error) {
+    console.error("Error in getUserPRStatusCounts:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) {
+      dbConnection.release();
+    }
+  }
+};
 
 // ✅ **Get Single PR Details Including Related Data**
 exports.getSinglePRDetails = async (req, res) => {

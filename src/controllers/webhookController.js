@@ -25,7 +25,7 @@ exports.handleStripeWebhook = async (req, res) => {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-
+    console.log(session)
     if (session.payment_status === "paid") {
       const clientReferenceId = session.client_reference_id;
       const transactionId = session.id;
@@ -51,13 +51,13 @@ exports.handleStripeWebhook = async (req, res) => {
 
         const prId = prData[0].id;
         const userId = prData[0].user_id;
-
+        console.log(prId);
+        console.log(userId);
         // ✅ Update PR Status to "paid"
         await dbConnection.query(
           "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
           [prId]
         );
-
         // ✅ Insert Payment Record into `payment_history`
         await dbConnection.query(
           "INSERT INTO payment_history (pr_id, user_id, stripe_session_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -74,7 +74,7 @@ exports.handleStripeWebhook = async (req, res) => {
           ]
         );
 
-        await dbConnection.commit(); // ✅ Commit transaction
+        await dbConnection.commit();
 
         // ✅ Send Email to Customer
         const mailOptions = {

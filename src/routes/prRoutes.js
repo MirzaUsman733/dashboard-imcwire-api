@@ -85,6 +85,25 @@ router.get(
   apiKeyMiddleware,
   prController.getSinglePRs
 );
+router.get(
+  "/get-single-pr/:pr_id",
+  authMiddleware,
+  apiKeyMiddleware,
+  prController.getSinglePRs
+);
+router.get(
+  "/get-single-pr/user/list",
+  authMiddleware,
+  apiKeyMiddleware,
+  prController.getUserSinglePRs
+);
+router.get(
+  "/get-single-pr/user/statuses",
+  authMiddleware,
+  apiKeyMiddleware,
+  prController.getUserPRStatusCounts
+);
+
 
 router.get(
   "/single-pr-detail/:single_pr_id",
