@@ -63,4 +63,17 @@ router.put(
   SuperAdminAuthMiddleware,
   authController.superadminUpdateUser
 );
+router.get(
+  "/superadmin-list",
+  SuperAdminAuthMiddleware,
+  authController.getAllUsers
+);
+
+// Protect route so only superadmin can access
+router.get(
+  "/superadmin/user/:userId",
+  SuperAdminAuthMiddleware,
+  authController.getSingleUserProfile
+);
+
 module.exports = router;

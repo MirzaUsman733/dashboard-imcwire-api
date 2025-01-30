@@ -719,3 +719,91 @@ exports.getUserProfile = async (req, res) => {
     res.status(500).json({ error: "Error fetching user profile" });
   }
 };
+
+// ✅ SuperAdmin - Get All Users API
+exports.getAllUsers = async (req, res) => {
+
+  try {
+    // Fetch all users from auth_user table
+    const [users] = await connection.query(
+      `SELECT 
+        auth_user_id, username, email, role, isAgency, status, created_at 
+      FROM auth_user`
+    );
+
+    // Fetch user profiles
+    const [profiles] = await connection.query(`SELECT * FROM user_profile`);
+
+    // Create a user dictionary for easy mapping
+    const profileMap = {};
+    profiles.forEach((profile) => {
+      profileMap[profile.user_id] = profile;
+    });
+
+    // Combine user data with profiles
+    const allUsers = users.map((user) => ({
+      id: user.auth_user_id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      isAgency: user.isAgency === 0 ? false : true,
+      status: user.status,
+      createdAt: user.created_at,
+      profile: profileMap[user.auth_user_id] || null, // Attach profile if exists
+    }));
+
+    res.status(200).json({ message: "Users retrieved successfully", users: allUsers });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Error fetching users" });
+  }
+};
+
+// ✅ SuperAdmin - Get Single User Profile API
+exports.getSingleUserProfile = async (req, res) => {
+  const { userId } = req.params; // Extract user ID from request params
+
+  try {
+    
+
+    // Fetch user info from auth_user
+    const [userResults] = await connection.query(
+      "SELECT auth_user_id, username, email, role, isAgency, status, created_at FROM auth_user WHERE auth_user_id = ?",
+      [userId]
+    );
+
+    if (userResults.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const user = userResults[0];
+
+    // Fetch user profile from user_profile table
+    const [profileResults] = await connection.query(
+      "SELECT * FROM user_profile WHERE user_id = ?",
+      [userId]
+    );
+
+    const profile = profileResults[0] || null;
+
+    // Construct user response
+    const userProfile = {
+      id: user.auth_user_id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      isAgency: user.isAgency === 0 ? false : true,
+      status: user.status,
+      createdAt: user.created_at,
+      profile, // Attach user profile if exists
+    };
+
+    res.status(200).json({
+      message: "User profile retrieved successfully",
+      user: userProfile,
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({ error: "Error fetching user profile" });
+  }
+};
