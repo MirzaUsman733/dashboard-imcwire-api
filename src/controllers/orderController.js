@@ -11,90 +11,10 @@ const transporter = nodemailer.createTransport({
     pass: "Sales@$$1aShahG!!boy,s",
   },
 });
-// exports.createOrder = async (req, res) => {
-//   try {
-//     const { name, email, totalPrice, clientId, address } = req.body;
-
-//     // Authenticate and get the token
-//     const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({
-//         clientid: process.env.clientid,
-//         clientsecret: process.env.clientsecret,
-//       }),
-//     });
-//     console.log(authResponse);
-//     if (!authResponse.ok) {
-//       return res.status(401).json({ message: "Authentication failed" });
-//     }
-
-//     const authResult = await authResponse.text();
-//     const token = authResponse.headers.get("Token");
-//     if (authResult === "Authorized" || !token) {
-//       return res.status(401).json({ message: "Unauthorized" });
-//     }
-
-//     const issueDate = new Date();
-//     const orderDueDate = new Date(issueDate);
-//     orderDueDate.setDate(issueDate.getDate() + 1);
-
-//     const formattedIssueDate = issueDate.toISOString().split("T")[0];
-//     const formattedOrderDueDate = orderDueDate.toISOString().split("T")[0];
-
-//     const orderPayload = [
-//       { MerchantId: "NUXLAY" },
-//       {
-//         OrderNumber: clientId,
-//         CurrencyAmount: `${totalPrice}.00`,
-//         Currency: "USD",
-//         OrderDueDate: formattedOrderDueDate,
-//         OrderType: "Service",
-//         IsConverted: "true",
-//         IssueDate: formattedIssueDate,
-//         OrderExpireAfterSeconds: "0",
-//         CustomerName: name,
-//         CustomerMobile: "",
-//         CustomerEmail: email,
-//         CustomerAddress: address,
-//       },
-//     ];
-//     console.log(orderPayload);
-//     // Create order using the token
-//     const orderResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/co`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         Token: token,
-//       },
-//       body: JSON.stringify(orderPayload),
-//     });
-//     console.log(orderResponse);
-//     const result = await orderResponse.json();
-//     console.log("Result :", result);
-//     if (orderResponse.ok && result[0]?.Status === "00") {
-//       const click2PayUrl = result[1]?.Click2Pay;
-//       if (click2PayUrl) {
-//         const finalUrl = `${click2PayUrl}&callback_url=https://dashboard.imcwire.com/thankyou`;
-//         return res.json({ finalUrl });
-//       } else {
-//         return res.status(500).json({ message: "Click2Pay URL not found" });
-//       }
-//     } else {
-//       return res.status(500).json({ message: "Order creation failed" });
-//     }
-//   } catch (error) {
-//     console.error("Error:", error);
-//     return res.status(500).json({ message: "Internal Server Error" });
-//   }
-// };
 
 exports.getOrderStatus = async (req, res) => {
   try {
     const { id } = req.body;
-    console.log("Order ID:", id);
 
     // Authenticate and get token
     const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
@@ -155,12 +75,6 @@ exports.getOrderStatus = async (req, res) => {
           const prId = prData[0].id;
           const userId = prData[0].user_id;
 
-          // ✅ Update PR Status to "paid"
-          await dbConnection.query(
-            "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
-            [prId]
-          );
-          // ✅ 1. Fetch User Email from `auth_user`
           const [userResult] = await dbConnection.query(
             "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
             [userId]
@@ -172,20 +86,48 @@ exports.getOrderStatus = async (req, res) => {
 
           const userEmail = userResult[0].email;
           const username = userResult[0].username;
-          // ✅ Insert Payment Record into `payment_history`
-          await dbConnection.query(
-            "INSERT INTO payment_history (pr_id, user_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [
-              prId,
-              userId,
-              orderID,
-              orderResultData[1]?.OrderAmount,
-              "USD",
-              "paid",
-              "PayPro",
-              userEmail,
-            ]
-          );
+          if (orderStatus === "PAID") {
+            // ✅ Update PR Status to "paid"
+            await dbConnection.query(
+              "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
+              [prId]
+            );
+            // ✅ 1. Fetch User Email from `auth_user`
+
+            // ✅ Insert Payment Record into `payment_history`
+            await dbConnection.query(
+              "INSERT INTO payment_history (pr_id, user_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              [
+                prId,
+                userId,
+                orderID,
+                orderResultData[1]?.OrderAmount,
+                "USD",
+                "paid",
+                "PayPro",
+                userEmail,
+              ]
+            );
+            // ✅ Add notification for successful payment
+            await dbConnection.query(
+              "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+              [
+                userId,
+                "Payment Successful",
+                `Your PR Order #${prId} payment of $${amountPaid} was successful.`,
+              ]
+            );
+          } else {
+            // ✅ Add notification for failed payment
+            await dbConnection.query(
+              "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+              [
+                userId,
+                "Payment Failed",
+                `Your PR Order #${prId} payment of $${amountPaid} has failed. Please try again.`,
+              ]
+            );
+          }
 
           await dbConnection.commit(); // ✅ Commit transaction
 

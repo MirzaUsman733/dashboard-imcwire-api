@@ -114,6 +114,3 @@ exports.delete = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
-
-
-

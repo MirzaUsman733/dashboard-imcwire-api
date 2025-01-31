@@ -90,7 +90,7 @@ exports.getAllPaymentHistories = async (req, res) => {
 // ✅ Fetch Payment History for Authenticated User (Users Only)
 exports.getUserPaymentHistory = async (req, res) => {
   const user_id = req.user.id; // Extracted from JWT token in middleware
-  console.log(user_id)
+  console.log(user_id);
   try {
     const [payments] = await connection.query(
       "SELECT * FROM payment_history WHERE user_id = ? ORDER BY created_at DESC",

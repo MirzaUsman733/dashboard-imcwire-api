@@ -156,3 +156,29 @@ exports.deletePlan = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+// Get a single plan by ID (Admin and User)
+exports.getPlanById = async (req, res) => {
+  try {
+    const { id } = req.params; // Extract the plan ID from route parameters
+
+    if (!id) {
+      return res.status(400).json({ message: "Plan ID is required" });
+    }
+
+    const [plans] = await connection.query(
+      "SELECT * FROM plan_items WHERE id = ?",
+      [id]
+    );
+
+    if (plans.length === 0) {
+      return res.status(404).json({ message: "Plan not found" });
+    }
+
+    res.status(200).json(plans[0]);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};

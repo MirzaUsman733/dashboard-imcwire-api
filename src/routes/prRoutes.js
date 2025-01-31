@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const prController = require("../controllers/prController");
 const authMiddleware = require("../middleware/authMiddleware");
-const prDataController = require("../controllers/prDataController");
+const prOrderDataController = require("../controllers/prOrderDataController");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 const multer = require("multer");
@@ -19,10 +19,10 @@ const checkFileUpload = (req, res, next) => {
 };
 // ✅ One API to insert all data at once
 router.post(
-  "/submit",
+  "/submit-order",
   authMiddleware,
   apiKeyMiddleware,
-  prDataController.submitPR
+  prOrderDataController.submitPR
 );
 
 // ✅ One API to insert all data at once
@@ -30,14 +30,14 @@ router.post(
   "/submit-custom-order",
   SuperAdminAuthMiddleware,
   apiKeyMiddleware,
-  prDataController.submitCustomOrder
+  prOrderDataController.submitCustomOrder
 );
 
 // ✅ One API to insert all data at once
 router.get(
   "/custom-order/:orderId",
   apiKeyMiddleware,
-  prDataController.getCustomOrder
+  prOrderDataController.getCustomOrder
 );
 
 // ✅ One API to insert all data at once
@@ -45,20 +45,35 @@ router.delete(
   "/custom-order/:orderId",
   SuperAdminAuthMiddleware,
   apiKeyMiddleware,
-  prDataController.deleteCustomOrder
+  prOrderDataController.deleteCustomOrder
 );
 
 router.get(
-  "/user-list",
+  "/user-order-list",
   authMiddleware,
   apiKeyMiddleware,
-  prDataController.getUserPRs
+  prOrderDataController.getUserPRs
 );
+
+router.get(
+  "/user-order/:userId",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prOrderDataController.getUserPRsById
+);
+
 router.get(
   "/superadmin-list",
   apiKeyMiddleware,
   SuperAdminAuthMiddleware,
-  prDataController.getAllPRs
+  prOrderDataController.getAllPRs
+);
+
+router.put(
+  "/superadmin/update-order-status/:prId",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prOrderDataController.updatePROrderStatusBySuperAdmin
 );
 
 // ✅ Handle `Self-Written` (File Upload to FTP) & `IMCWire-Written` (JSON Body)
@@ -103,7 +118,6 @@ router.get(
   apiKeyMiddleware,
   prController.getUserPRStatusCounts
 );
-
 
 router.get(
   "/single-pr-detail/:single_pr_id",

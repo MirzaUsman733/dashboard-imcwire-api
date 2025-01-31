@@ -4,7 +4,7 @@ const connection = require("../config/dbconfig");
 exports.createCoupon = async (req, res) => {
   const MAX_RETRIES = 3; // Number of retry attempts
   let attempt = 0;
-  
+
   while (attempt < MAX_RETRIES) {
     try {
       const {
@@ -16,13 +16,12 @@ exports.createCoupon = async (req, res) => {
       } = req.body;
 
       if (!couponCode || !discountPercentage) {
-        return res
-          .status(400)
-          .json({ message: "Coupon code and discount percentage are required" });
+        return res.status(400).json({
+          message: "Coupon code and discount percentage are required",
+        });
       }
 
       const dbConnection = await connection.getConnection();
-      await dbConnection.beginTransaction();
 
       // ✅ **Check if `plan_id` exists in `plan_items`**
       if (plan_id) {
@@ -33,9 +32,9 @@ exports.createCoupon = async (req, res) => {
 
         if (planCheck.length === 0) {
           await dbConnection.rollback();
-          return res
-            .status(404)
-            .json({ message: "Plan not found. Please provide a valid plan_id." });
+          return res.status(404).json({
+            message: "Plan not found. Please provide a valid plan_id.",
+          });
         }
       }
 
@@ -58,11 +57,10 @@ exports.createCoupon = async (req, res) => {
         message: "Coupon created successfully",
         couponId: result.insertId,
       });
-
     } catch (error) {
       console.error(`Attempt ${attempt + 1} failed:`, error);
 
-      if (error.code === 'ER_LOCK_WAIT_TIMEOUT' && attempt < MAX_RETRIES - 1) {
+      if (error.code === "ER_LOCK_WAIT_TIMEOUT" && attempt < MAX_RETRIES - 1) {
         console.warn("Retrying transaction due to lock timeout...");
         attempt++;
         continue; // Retry transaction
@@ -75,7 +73,6 @@ exports.createCoupon = async (req, res) => {
     }
   }
 };
-
 
 // ✅ **Update an existing coupon (Admin Only)**
 exports.updateCoupon = async (req, res) => {
@@ -141,7 +138,7 @@ exports.validateCoupon = async (req, res) => {
     }
 
     const [coupons] = await connection.query(
-      "SELECT * FROM coupons WHERE couponCode = ?",
+      "SELECT *, (usageLimit > 0 AND timesUsed >= usageLimit) as isUsageLimitReached, (expirationDate IS NOT NULL AND expirationDate < NOW()) as isExpired FROM coupons WHERE couponCode = ?",
       [couponCode]
     );
     const coupon = coupons[0];
@@ -151,14 +148,10 @@ exports.validateCoupon = async (req, res) => {
     }
 
     // Check expiration and usage limit
-    const currentTime = new Date();
-    if (
-      coupon.expirationDate &&
-      new Date(coupon.expirationDate) < currentTime
-    ) {
+    if (coupon.isExpired) {
       return res.status(400).json({ message: "Coupon has expired" });
     }
-    if (coupon.usageLimit > 0 && coupon.timesUsed >= coupon.usageLimit) {
+    if (coupon.isUsageLimitReached) {
       return res.status(400).json({ message: "Coupon usage limit reached" });
     }
 
@@ -168,7 +161,49 @@ exports.validateCoupon = async (req, res) => {
       status: coupon.status,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+// ✅ **Update Coupon Usage**
+exports.updateCouponUsage = async (req, res) => {
+  try {
+    const { couponCode } = req.body;
+
+    if (!couponCode) {
+      return res.status(400).json({ message: "Coupon code is required" });
+    }
+
+    const [coupons] = await connection.query(
+      "SELECT * FROM coupons WHERE couponCode = ? AND expirationDate > NOW() AND (usageLimit = 0 OR timesUsed < usageLimit)",
+      [couponCode]
+    );
+    const coupon = coupons[0];
+
+    if (!coupon) {
+      return res
+        .status(404)
+        .json({ message: "Invalid coupon code or coupon conditions not met" });
+    }
+
+    // Update the timesUsed count
+    const result = await connection.query(
+      "UPDATE coupons SET timesUsed = timesUsed + 1 WHERE id = ?",
+      [coupon.id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(500).json({ message: "Failed to update coupon usage" });
+    }
+
+    res.status(200).json({ message: "Coupon usage updated successfully" });
+  } catch (error) {
+    if (connection)
+      res
+        .status(500)
+        .json({ message: "Internal Server Error", error: error.message });
   }
 };
 

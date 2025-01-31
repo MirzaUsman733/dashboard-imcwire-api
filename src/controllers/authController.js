@@ -54,26 +54,6 @@ exports.registerUser = async (req, res) => {
         expiresIn: "7d",
       }
     );
-    // Send Welcome Email
-    //   const mailOptions = {
-    //     from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-    //     to: email,
-    //     subject: "Welcome to IMCWire - Your Registration is Successful 🎉",
-    //     html: `
-    //   <h2>Welcome, ${username}!</h2>
-    //   <p>Thank you for registering on IMCWire.</p>
-    //   <p>Your account is now active, and you can start using our platform.</p>
-    //   <p><strong>Email:</strong> ${email}</p>
-    //   <p><strong>Role:</strong> ${role || "user"}</p>
-    //   <p><strong>Agency:</strong> ${isAgency ? "Yes" : "No"}</p>
-    //   <p>Click below to login:</p>
-    //   <a href="https://yourfrontend.com/login" style="padding: 10px 20px; background: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px;">Login Now</a>
-    //   <p>We’re excited to have you on board! If you have any questions, feel free to reach out.</p>
-    //   <p>Best Regards,<br>IMCWire Support Team</p>
-    // `,
-    //   };
-
-    //   await transporter.sendMail(mailOptions);
     const mailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
       to: email,

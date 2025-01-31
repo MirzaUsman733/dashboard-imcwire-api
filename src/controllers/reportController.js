@@ -69,7 +69,7 @@ const deleteFromFTP = async (filePath) => {
 // ✅ Create Report and Upload Files in One API (Ensuring Ownership & One Report per `single_pr_id`)
 exports.createFullReport = async (req, res) => {
   let dbConnection;
-  
+
   try {
     const { pr_id, single_pr_id, title, user_id } = req.body;
     const pdfFile = req.files["pdf"] ? req.files["pdf"][0] : null;
@@ -139,9 +139,9 @@ exports.createFullReport = async (req, res) => {
     const reportId = reportResult.insertId;
 
     const ftpFolderPath = `/public_html/files/uploads/reports`;
-  // ✅ Declare the paths outside the conditions
-  let pdfFtpPath = "";
-  let excelFtpPath = "";
+    // ✅ Declare the paths outside the conditions
+    let pdfFtpPath = "";
+    let excelFtpPath = "";
     if (pdfFile) {
       // ✅ Handle PDF Upload Directly to FTP
       const pdfUniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
@@ -277,8 +277,14 @@ exports.createFullReport = async (req, res) => {
         <p>You can check the details of your report in your dashboard.</p>
         <p>Additionally, you can download the published report in the following formats:</p>
         <p>
-             <a href="${pdfFtpPath.replace("/public_html/files", "")}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
-             <a href="${excelFtpPath.replace("/public_html/files", "")}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+             <a href="${pdfFtpPath.replace(
+               "/public_html/files",
+               ""
+             )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+             <a href="${excelFtpPath.replace(
+               "/public_html/files",
+               ""
+             )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
         </p>
         <p>If you have any questions, feel free to contact our support team.</p>
         <p>Best Regards,</p>
@@ -469,7 +475,7 @@ exports.getUserReport = async (req, res) => {
   try {
     const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
     const { report_id } = req.params;
-    console.log(report_id)
+    console.log(report_id);
     console.log(user_id);
     dbConnection = await connection.getConnection();
 
@@ -484,7 +490,6 @@ exports.getUserReport = async (req, res) => {
         message: "Report not found or you don't have access to this report.",
       });
     }
-
 
     // Example: Fetch PDF files linked to this report
     const [pdfFiles] = await dbConnection.query(

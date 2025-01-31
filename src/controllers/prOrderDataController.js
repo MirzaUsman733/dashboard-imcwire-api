@@ -1,10 +1,9 @@
 const connection = require("../config/dbconfig");
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
-
+const { v4: uuidv4 } = require("uuid");
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
 exports.submitPR = async (req, res) => {
   const {
-    client_id,
     plan_id,
     prType,
     pr_status,
@@ -15,8 +14,10 @@ exports.submitPR = async (req, res) => {
     payment_status,
   } = req.body;
 
+  // Generate a random client_id
+  const client_id = uuidv4();
+
   if (
-    !client_id ||
     !plan_id ||
     !prType ||
     !payment_method ||
@@ -28,9 +29,8 @@ exports.submitPR = async (req, res) => {
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
-
   let dbConnection;
-
+  console.log();
   try {
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction(); // Begin Transaction
@@ -110,9 +110,10 @@ exports.submitPR = async (req, res) => {
       ]
     );
     const prId = prResult.insertId;
-    const [newPlanRecord] = await dbConnection.query(
+    // Store plan records without using its ID later
+    await dbConnection.query(
       "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs, pr_id) VALUES (?, ?, ?, ?, ?)",
-      [req.user.id, plan_id, totalPrs, 0, prId] // `used_prs` starts from 1 because it's a new PR
+      [req.user.id, plan_id, totalPrs, 1, prId] // Assuming `prId` is generated from previous PR insert
     );
 
     // ✅ 8. Link PR to Multiple Target Countries
@@ -327,6 +328,112 @@ exports.getAllPRs = async (req, res) => {
   }
 };
 
+// ✅ **Update PR Order Status (SuperAdmin)**
+exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
+  try {
+    const { prId } = req.params; // Extract the PR ID from route parameters
+    const { newStatus } = req.body; // Extract the new status from the request body
+
+    if (!prId || !newStatus) {
+      return res
+        .status(400)
+        .json({ message: "PR ID and new status are required" });
+    }
+
+    // ✅ Check if the PR exists and fetch user_id
+    const [existingPRs] = await connection.query(
+      "SELECT user_id FROM pr_data WHERE id = ?",
+      [prId]
+    );
+
+    if (existingPRs.length === 0) {
+      return res.status(404).json({ message: "PR not found" });
+    }
+    const userId = existingPRs[0].user_id; // Assuming PR is associated with a single user
+
+    // ✅ Update the status of the PR data
+    const updateResult = await connection.query(
+      "UPDATE pr_data SET pr_status = ? WHERE id = ?",
+      [newStatus, prId]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      return res.status(404).json({ message: "No change in status" });
+    }
+
+    // ✅ Add notification for the user
+    await connection.query(
+      "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+      [
+        userId,
+        `PR Order ${prId} Status Updated`,
+        `Your PR Order ${prId} status has been updated to ${newStatus}.`,
+      ]
+    );
+
+    res
+      .status(200)
+      .json({ message: "PR status updated successfully, notification sent" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+// ✅ **Retrieve PRs for Logged-in User**
+exports.getUserPRsById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // ✅ Fetch PR Data for the logged-in user
+    const [prData] = await connection.query(
+      "SELECT * FROM pr_data WHERE user_id = ? ORDER BY created_at DESC",
+      [userId]
+    );
+
+    if (prData.length === 0) {
+      return res.status(404).json({ message: "No PRs found for this user" });
+    }
+
+    // ✅ Fetch Related Data for Each PR
+    for (let pr of prData) {
+      // Fetch Target Countries & Translations for PR
+      const [targetCountries] = await connection.query(
+        `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
+           FROM pr_target_countries ptc
+           JOIN target_countries tc ON ptc.target_country_id = tc.id
+           LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
+           WHERE ptc.pr_id = ?`,
+        [pr.id]
+      );
+
+      // Fetch Industry Categories for PR
+      const [industryCategories] = await connection.query(
+        `SELECT ic.id, ic.categoryName, ic.categoryPrice
+           FROM pr_industry_categories pic
+           JOIN industry_categories ic ON pic.target_industry_id = ic.id
+           WHERE pic.pr_id = ?`,
+        [pr.id]
+      );
+
+      // Add Related Data to PR Object
+      pr.targetCountries = targetCountries.length ? targetCountries : [];
+      pr.industryCategories = industryCategories.length
+        ? industryCategories
+        : [];
+    }
+
+    res.status(200).json(prData);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 exports.submitCustomOrder = async (req, res) => {
   const {
     orderId,
@@ -439,7 +546,6 @@ exports.submitCustomOrder = async (req, res) => {
 
 exports.getCustomOrder = async (req, res) => {
   const { orderId } = req.params;
-  console.log(orderId);
   if (!orderId) {
     return res.status(400).json({ message: "Order ID is required" });
   }
@@ -587,11 +693,9 @@ exports.deleteCustomOrder = async (req, res) => {
     ]);
 
     await dbConnection.commit();
-    res
-      .status(200)
-      .json({
-        message: "Custom order and associated data deleted successfully",
-      });
+    res.status(200).json({
+      message: "Custom order and associated data deleted successfully",
+    });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     console.error("Error in deleteCustomOrder:", error);

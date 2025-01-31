@@ -15,12 +15,9 @@ const transporter = nodemailer.createTransport({
     pass: "Sales@$$1aShahG!!boy,s",
   },
 });
-
+// Submit Single PR
 exports.submitSinglePR = async (req, res) => {
   let dbConnection;
-  console.log(req.body)
-  console.log(req.file)
-  console.log(req)
   try {
     const isFormData = req.headers["content-type"]?.includes(
       "multipart/form-data"
@@ -51,12 +48,25 @@ exports.submitSinglePR = async (req, res) => {
     const pr = prData[0];
     const plan_id = pr.plan_id;
     // ✅ 2. Validate PR Ownership, Payment, and Approval
+    // ✅ 2. Validate PR Ownership, Payment, and Approval
     if (pr.user_id !== user_id)
       return res.status(403).json({ message: "Unauthorized PR access." });
     if (pr.payment_status !== "paid")
       return res.status(400).json({ message: "PR not paid." });
-    if (pr.pr_status === "pending")
-      return res.status(403).json({ message: "Waiting for admin approval." });
+    if (pr.pr_status === "Rejected")
+      return res.status(403).json({
+        message: "PR rejected. Please contact support to resolve the issue.",
+      });
+    if (pr.pr_status === "Pending")
+      return res
+        .status(403)
+        .json({ message: "PR Order is not approved. Please contact support." });
+
+    // Check if the PR is approved before continuing
+    if (pr.pr_status !== "Approved")
+      return res
+        .status(403)
+        .json({ message: "PR is not approved for submission." });
 
     // ✅ 3. Check Company Ownership
     const [companyData] = await dbConnection.query(
@@ -438,7 +448,6 @@ exports.updateSinglePR = async (req, res) => {
 exports.getSinglePRs = async (req, res) => {
   const { pr_id } = req.params;
   const user_id = req.user.id;
-  console.log(user_id, pr_id);
   let dbConnection;
 
   if (!pr_id) {
@@ -521,7 +530,6 @@ exports.getUserSinglePRs = async (req, res) => {
 
   try {
     dbConnection = await connection.getConnection();
-    console.log(`Fetching all single PRs for user ID: ${user_id}`);
 
     // ✅ 1. Retrieve all Single PRs that belong to the authenticated user
     const [singlePRs] = await dbConnection.query(
@@ -534,15 +542,15 @@ exports.getUserSinglePRs = async (req, res) => {
       JOIN companies c ON sp.company_id = c.id
       LEFT JOIN pr_pdf_files pdf ON sp.id = pdf.single_pr_id
       LEFT JOIN pr_url_tags ut ON sp.id = ut.single_pr_id
-      WHERE sp.user_id = ?`, 
+      WHERE sp.user_id = ?`,
       [user_id]
     );
 
     if (singlePRs.length === 0) {
-      return res.status(404).json({ message: "No single PRs found for this user." });
+      return res
+        .status(404)
+        .json({ message: "No single PRs found for this user." });
     }
-
-    console.log(`Found ${singlePRs.length} single PRs for user ID: ${user_id}`);
 
     // ✅ 2. Fetch tags for each Single PR (if applicable)
     const singlePRsWithTags = await Promise.all(
@@ -583,7 +591,6 @@ exports.getUserPRStatusCounts = async (req, res) => {
 
   try {
     dbConnection = await connection.getConnection();
-    console.log(`Fetching PR status counts for user ID: ${user_id}`);
 
     // ✅ Count PRs based on their status for the authenticated user
     const [statusCounts] = await dbConnection.query(
@@ -598,18 +605,16 @@ exports.getUserPRStatusCounts = async (req, res) => {
     // ✅ Format response
     const statusSummary = {
       "Not Started": 0,
-      "Pending": 0,
-      "Approved": 0,
+      Pending: 0,
+      Approved: 0,
       "In Progress": 0,
-      "Published": 0,
+      Published: 0,
     };
 
     // ✅ Populate counts dynamically
     statusCounts.forEach((row) => {
       statusSummary[row.status] = row.count;
     });
-
-    console.log(`PR status counts for user ID ${user_id}:`, statusSummary);
 
     res.status(200).json({
       message: "PR status counts retrieved successfully.",
@@ -689,8 +694,6 @@ exports.getAllSinglePRs = async (req, res) => {
     // Get database connection
     dbConnection = await connection.getConnection();
 
-    console.log("Database connection established.");
-
     // Execute query
     const [singlePRs] = await dbConnection.query(
       `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id_tags_id, sp.status, 
@@ -699,27 +702,23 @@ exports.getAllSinglePRs = async (req, res) => {
        LEFT JOIN companies c ON sp.company_id = c.id`
     );
 
-    console.log("Query executed successfully. Records found:", singlePRs.length);
-
     // Send response
     res.status(200).json({
       message: "All Single PRs retrieved successfully.",
       data: singlePRs,
     });
-
   } catch (error) {
-    console.error("Error fetching Single PRs:", error);  // Detailed error logging
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
-
+    console.error("Error fetching Single PRs:", error); // Detailed error logging
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     // Release database connection safely
     if (dbConnection) {
       dbConnection.release();
-      console.log("Database connection released.");
     }
   }
 };
-
 
 // ✅ **Superadmin: Get Single PRs by User ID**
 exports.getSinglePRsByUser = async (req, res) => {
@@ -817,7 +816,6 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
   try {
     const { status, pr_id } = req.body;
     const { single_pr_id } = req.params;
-
     // Ensure user is superAdmin
     const user_role = req.user?.role;
     if (user_role !== "super_admin") {
@@ -826,9 +824,11 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
 
     dbConnection = await connection.getConnection();
 
-    // Check if the provided pr_id exists in single_pr_details table
     const [existingPR] = await dbConnection.query(
-      "SELECT status, user_id FROM single_pr_details WHERE id = ? AND pr_id = ?",
+      `SELECT spd.status, spd.user_id, pd.plan_id 
+       FROM single_pr_details spd
+       JOIN pr_data pd ON spd.pr_id = pd.id
+       WHERE spd.id = ? AND spd.pr_id = ?`,
       [single_pr_id, pr_id]
     );
     if (existingPR.length === 0) {
@@ -839,6 +839,8 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
     }
 
     const userId = existingPR[0].user_id;
+    const previousStatus = existingPR[0].status;
+    const planId = existingPR[0].plan_id;
 
     // Fetch user email from auth_user table
     const [user] = await dbConnection.query(
@@ -857,12 +859,44 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
       "UPDATE single_pr_details SET status = ? WHERE id = ?",
       [status, single_pr_id]
     );
+    // Check if the status changed to 'rejected' and previous status was not 'rejected'
+    if (
+      status.toLowerCase() === "rejected" &&
+      previousStatus.toLowerCase() !== "rejected"
+    ) {
+      await dbConnection.query(
+        "UPDATE plan_records SET used_prs = used_prs - 1 WHERE user_id = ? AND plan_id = ? AND pr_id = ?",
+        [userId, planId, pr_id]
+      );
+    }
+    // Define notification message based on status
+    let notificationMessage;
+    switch (status.toLowerCase()) {
+      case "pending":
+        notificationMessage = `Your Single PR #${single_pr_id} is now pending, waiting for admin approval.`;
+        break;
+      case "approved":
+        notificationMessage = `Your Single PR #${single_pr_id} has been approved. We are now starting work on it.`;
+        break;
+      case "published":
+        notificationMessage = `Congratulations! Your Single PR #${single_pr_id} has been published.`;
+        break;
+      case "rejected":
+        notificationMessage = `Your Single PR #${single_pr_id} has been rejected. Please contact support for more details.`;
+      default:
+        notificationMessage = `Your PR #${single_pr_id} status has been updated to ${status}.`;
+    }
 
+    // ✅ Add notification for status update
+    await dbConnection.query(
+      "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+      [userId, "PR Status Updated", notificationMessage]
+    );
     // Send email notification
     const mailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
       to: userEmail,
-      subject: `Your PR Status has been updated to ${status} - IMCWire`,
+      subject: `Your PR# ${single_pr_id} Status has been updated to ${status} - IMCWire`,
       html: `
         <p>Dear ${username},</p>
         <p>Your PR status has been updated to <strong>${status}</strong>.</p>

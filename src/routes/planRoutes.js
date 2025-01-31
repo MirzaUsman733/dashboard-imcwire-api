@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const planController = require("../controllers/planController");
-const adminAuthMiddleware = require("../middleware/AdminAuthMiddleware");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 
@@ -27,5 +26,6 @@ router.delete(
 
 // Public route
 router.get("/list", apiKeyMiddleware, planController.getPlans);
-
+// New route for getting a single plan by ID
+router.get("/single/:id", apiKeyMiddleware, planController.getPlanById);
 module.exports = router;

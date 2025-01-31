@@ -25,7 +25,7 @@ exports.handleStripeWebhook = async (req, res) => {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    console.log(session)
+    console.log(session);
     if (session.payment_status === "paid") {
       const clientReferenceId = session.client_reference_id;
       const transactionId = session.id;
@@ -33,6 +33,7 @@ exports.handleStripeWebhook = async (req, res) => {
       const currency = session.currency;
       const receiptEmail = session.customer_email;
       const paymentMethod = session.payment_method_types[0];
+      const paymentStatus = session.payment_status; // 'paid' or 'unpaid'
 
       let dbConnection;
       try {
@@ -53,26 +54,49 @@ exports.handleStripeWebhook = async (req, res) => {
         const userId = prData[0].user_id;
         console.log(prId);
         console.log(userId);
-        // ✅ Update PR Status to "paid"
-        await dbConnection.query(
-          "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
-          [prId]
-        );
-        // ✅ Insert Payment Record into `payment_history`
-        await dbConnection.query(
-          "INSERT INTO payment_history (pr_id, user_id, stripe_session_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-          [
-            prId,
-            userId,
-            session.id,
-            clientReferenceId,
-            amountPaid,
-            currency,
-            "paid",
-            paymentMethod,
-            receiptEmail,
-          ]
-        );
+        if (paymentStatus === "paid") {
+          // ✅ Update PR Status to "paid"
+          await dbConnection.query(
+            "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
+            [prId]
+          );
+
+          // ✅ Insert Payment Record into `payment_history`
+          await dbConnection.query(
+            "INSERT INTO payment_history (pr_id, user_id, stripe_session_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+              prId,
+              userId,
+              session.id,
+              clientReferenceId,
+              amountPaid,
+              currency,
+              "paid",
+              paymentMethod,
+              receiptEmail,
+            ]
+          );
+
+          // ✅ Add notification for successful payment
+          await dbConnection.query(
+            "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+            [
+              userId,
+              "Payment Successful",
+              `Your PR Order #${prId} payment of $${amountPaid} was successful.`,
+            ]
+          );
+        } else {
+          // ✅ Add notification for failed payment
+          await dbConnection.query(
+            "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+            [
+              userId,
+              "Payment Failed",
+              `Your PR Order #${prId} payment of $${amountPaid} has failed. Please try again.`,
+            ]
+          );
+        }
 
         await dbConnection.commit();
 
@@ -80,15 +104,7 @@ exports.handleStripeWebhook = async (req, res) => {
         const mailOptions = {
           from: "IMCWire <Orders@imcwire.com>",
           to: receiptEmail,
-          subject: `Your Payment Has Been Successfully Processed - Transaction ${clientReferenceId}`,
-          //   html: `
-          //       <p>Dear Customer,</p>
-          //       <p>Your payment of <strong>$${amountPaid} ${currency.toUpperCase()}</strong> has been successfully processed.</p>
-          //       <p>Your PR status has been updated to <strong>Paid</strong>. You can now access your PR dashboard.</p>
-          //       <p>Thank you for choosing IMCWire!</p>
-          //       <p>Best Regards,<br>IMCWire Team</p>
-          //     `,
-          // };
+          subject: `Your Payment Has Been Successfully Processed - PR# ${prId} Transaction ${clientReferenceId}`,
           html: `
         <!DOCTYPE html>
           <html lang="en">
@@ -141,7 +157,7 @@ exports.handleStripeWebhook = async (req, res) => {
         const adminMailOptions = {
           from: "IMCWire <Orders@imcwire.com>",
           to: adminEmails.join(","),
-          subject: `New Payment Received - Transaction ${clientReferenceId}`,
+          subject: `New Payment Received - PR# ${prId} Transaction ${clientReferenceId}`,
           html: `
               <p>New payment received:</p>
               <ul>

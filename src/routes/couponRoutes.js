@@ -20,6 +20,11 @@ router.put(
   SuperAdminAuthMiddleware,
   couponController.updateCoupon
 );
+router.put(
+  "/updateusagelimit",
+  apiKeyMiddleware,
+  couponController.updateCouponUsage
+);
 // 🔹 Users Can Only See Active Coupons
 router.get("/active-list", apiKeyMiddleware, couponController.getUserCoupons);
 
