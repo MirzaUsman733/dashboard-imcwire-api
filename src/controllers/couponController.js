@@ -58,10 +58,8 @@ exports.createCoupon = async (req, res) => {
         couponId: result.insertId,
       });
     } catch (error) {
-      console.error(`Attempt ${attempt + 1} failed:`, error);
 
       if (error.code === "ER_LOCK_WAIT_TIMEOUT" && attempt < MAX_RETRIES - 1) {
-        console.warn("Retrying transaction due to lock timeout...");
         attempt++;
         continue; // Retry transaction
       }

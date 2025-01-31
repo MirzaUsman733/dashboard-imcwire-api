@@ -459,15 +459,6 @@ exports.superadminUpdateUser = async (req, res) => {
       return res.status(400).json({ message: "Target user ID is required" });
     }
 
-    console.log(
-      "Updating User:",
-      targetUserId,
-      "Role:",
-      role,
-      "Status:",
-      status
-    );
-
     // Fetch the target user details
     const [targetUsers] = await connection.query(
       "SELECT * FROM auth_user WHERE auth_user_id = ?",
@@ -479,8 +470,6 @@ exports.superadminUpdateUser = async (req, res) => {
     if (!targetUser) {
       return res.status(404).json({ message: "Target user not found" });
     }
-
-    console.log("Target User Details:", targetUser);
 
     // Only allow superadmin to change role and status
     if (role) {
@@ -622,7 +611,6 @@ exports.superadminUpdateUser = async (req, res) => {
       updates,
     });
   } catch (error) {
-    console.error("Error updating user role/status:", error);
     return res.status(500).json({ error: "Error updating user role/status" });
   }
 };
@@ -748,7 +736,6 @@ exports.getAllUsers = async (req, res) => {
       .status(200)
       .json({ message: "Users retrieved successfully", users: allUsers });
   } catch (error) {
-    console.error("Error fetching users:", error);
     res.status(500).json({ error: "Error fetching users" });
   }
 };
@@ -795,7 +782,6 @@ exports.getSingleUserProfile = async (req, res) => {
       user: userProfile,
     });
   } catch (error) {
-    console.error("Error fetching user profile:", error);
     res.status(500).json({ error: "Error fetching user profile" });
   }
 };

@@ -3,6 +3,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const helmet = require("helmet");
+const fs = require("fs");
+const compression = require("compression");
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
+
 const authRoutes = require("./routes/authRoutes");
 const planRoutes = require("./routes/planRoutes");
 const companyRoutes = require("./routes/companyRoutes");
@@ -15,13 +20,27 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
 const howItWorksRoutes = require("./routes/howItWorksRoutes");
-const compression = require("compression");
 
 const app = express();
+
+// Security Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"]
+    }
+  }
+}));
 
 // Middleware
 app.use(helmet());
 app.use(cors());
+app.use(morgan('combined'));
 app.use("/v1/webhook", webhookRoutes);
 app.use(
   compression({
@@ -34,6 +53,16 @@ app.use(
     },
   })
 );
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests, please try again later."
+});
+
+app.use(limiter);
+
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 

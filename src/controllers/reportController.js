@@ -1,7 +1,6 @@
 const multer = require("multer");
 const { Client } = require("basic-ftp");
 const { v4: uuidv4 } = require("uuid");
-const path = require("path");
 const connection = require("../config/dbconfig");
 const ftpConfig = require("../config/ftpConfig");
 const streamifier = require("streamifier");
@@ -13,8 +12,8 @@ const upload = multer({ storage });
 // ✅ Upload File Directly to FTP
 const uploadToFTP = async (fileBuffer, fileName, folderPath, retries = 3) => {
   const client = new Client();
-  client.ftp.verbose = true; // Enable logging
-  client.ftp.timeout = 60000; // Increase timeout to 60 seconds
+  client.ftp.verbose = true;
+  client.ftp.timeout = 60000;
   try {
     await client.access(ftpConfig);
     await client.ensureDir(folderPath);
@@ -25,20 +24,16 @@ const uploadToFTP = async (fileBuffer, fileName, folderPath, retries = 3) => {
     // ✅ Retry Upload Mechanism
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        console.log(`FTP Upload Attempt ${attempt}: ${folderPath}/${fileName}`);
         await client.uploadFrom(stream, `${folderPath}/${fileName}`);
-        console.log(`File uploaded successfully: ${folderPath}/${fileName}`);
         client.close();
         return `${folderPath}/${fileName}`; // Return FTP file path
       } catch (uploadError) {
-        console.error(`FTP Upload Attempt ${attempt} Failed:`, uploadError);
         if (attempt === retries)
           throw new Error("FTP Upload Failed after retries");
       }
     }
     return `${folderPath}/${fileName}`; // Return FTP file path
   } catch (error) {
-    console.error("FTP Upload Error:", error);
     client.close();
     throw new Error("FTP Upload Failed");
   }
@@ -61,7 +56,6 @@ const deleteFromFTP = async (filePath) => {
     await client.remove(filePath);
     client.close();
   } catch (error) {
-    console.error("FTP Deletion Error:", error);
     client.close();
   }
 };
@@ -127,10 +121,8 @@ exports.createFullReport = async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    console.log(userData);
     const username = userData[0].username;
     const userEmail = userData[0].email;
-    console.log(userEmail);
     // ✅ Insert Report
     const [reportResult] = await dbConnection.query(
       "INSERT INTO reports (title, pr_id, single_pr_id, user_id) VALUES (?, ?, ?, ?)",
@@ -309,7 +301,6 @@ exports.createFullReport = async (req, res) => {
     });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
-    console.error("Error creating report:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();
@@ -456,7 +447,6 @@ exports.updateFullReport = async (req, res) => {
     });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
-    console.error("Error updating report:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();
@@ -475,8 +465,6 @@ exports.getUserReport = async (req, res) => {
   try {
     const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
     const { report_id } = req.params;
-    console.log(report_id);
-    console.log(user_id);
     dbConnection = await connection.getConnection();
 
     // ✅ Fetch Report Details
@@ -514,7 +502,6 @@ exports.getUserReport = async (req, res) => {
 
     res.status(200).json(report);
   } catch (error) {
-    console.error("Error fetching user report:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();
@@ -565,7 +552,6 @@ exports.getAllUserReports = async (req, res) => {
 
     res.status(200).json(reportsWithFiles);
   } catch (error) {
-    console.error("Error fetching user reports:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();

@@ -18,7 +18,6 @@ exports.sendNotification = async (req, res) => {
       .status(201)
       .json({ success: true, message: "Notification sent successfully." });
   } catch (error) {
-    console.error("❌ Error Sending Notification:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -34,7 +33,6 @@ exports.getUserNotifications = async (req, res) => {
 
     return res.status(200).json({ success: true, notifications });
   } catch (error) {
-    console.error("❌ Error Fetching Notifications:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -60,7 +58,6 @@ exports.markNotificationAsRead = async (req, res) => {
       .status(200)
       .json({ success: true, message: "Notification marked as read." });
   } catch (error) {
-    console.error("❌ Error Marking Notification as Read:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

@@ -89,8 +89,7 @@ exports.getAllPaymentHistories = async (req, res) => {
 
 // ✅ Fetch Payment History for Authenticated User (Users Only)
 exports.getUserPaymentHistory = async (req, res) => {
-  const user_id = req.user.id; // Extracted from JWT token in middleware
-  console.log(user_id);
+  const user_id = req.user.id;
   try {
     const [payments] = await connection.query(
       "SELECT * FROM payment_history WHERE user_id = ? ORDER BY created_at DESC",
@@ -123,42 +122,32 @@ exports.addCustomPayment = async (req, res) => {
     !paymentMethod ||
     !receiptEmail
   ) {
-    console.error("Validation Error: Missing required fields", req.body);
     return res.status(400).json({ error: "All fields are required" });
   }
 
   let dbConnection;
   try {
-    console.log("Connecting to database...");
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction();
-    console.log("Database connection established and transaction started.");
 
     // ✅ Check if pr_id exists in pr_data
-    console.log(`Checking if PR ID: ${prId} exists in pr_data...`);
     const [prCheck] = await dbConnection.query(
       "SELECT id FROM pr_data WHERE id = ?",
       [prId]
     );
 
     if (prCheck.length === 0) {
-      console.error(`Error: PR ID ${prId} does not exist in pr_data.`);
       return res.status(400).json({ error: `PR ID ${prId} does not exist.` });
     }
 
-    console.log(`PR ID ${prId} found in pr_data. Proceeding with update.`);
 
     // ✅ Update PR Status to "paid"
-    console.log(`Updating PR status to "paid" for PR ID: ${prId}`);
     await dbConnection.query(
       "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
       [prId]
     );
 
     // ✅ Insert Payment Record into `payment_history`
-    console.log(
-      `Inserting payment record for Transaction ID: ${transactionId}`
-    );
     await dbConnection.query(
       "INSERT INTO payment_history (pr_id, user_id, stripe_session_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
@@ -175,7 +164,6 @@ exports.addCustomPayment = async (req, res) => {
     );
 
     await dbConnection.commit();
-    console.log("Transaction committed successfully.");
 
     // ✅ Send Email to Customer
     const mailOptions = {
@@ -192,9 +180,7 @@ exports.addCustomPayment = async (req, res) => {
     };
 
     try {
-      console.log(`Sending email to customer: ${receiptEmail}`);
       await transporter.sendMail(mailOptions);
-      console.log("Customer email sent successfully.");
     } catch (emailError) {
       console.error("Error sending email to customer:", emailError);
     }
@@ -217,22 +203,17 @@ exports.addCustomPayment = async (req, res) => {
     };
 
     try {
-      console.log(`Sending email to admin: ${adminEmails.join(",")}`);
       await transporter.sendMail(adminMailOptions);
-      console.log("Admin email sent successfully.");
     } catch (emailError) {
       console.error("Error sending email to admin:", emailError);
     }
 
-    console.log("Manual payment process completed successfully.");
     return res
       .status(200)
       .json({ message: "Manual payment added successfully" });
   } catch (error) {
-    console.error("Error processing manual payment:", error);
 
     if (dbConnection) {
-      console.log("Rolling back transaction due to error...");
       await dbConnection.rollback();
     }
 
@@ -241,7 +222,6 @@ exports.addCustomPayment = async (req, res) => {
       .json({ error: "Internal Server Error", details: error.message });
   } finally {
     if (dbConnection) {
-      console.log("Releasing database connection...");
       dbConnection.release();
     }
   }

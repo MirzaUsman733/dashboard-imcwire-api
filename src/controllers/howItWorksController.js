@@ -46,7 +46,6 @@ exports.getById = async (req, res) => {
 
 // Create new record
 exports.create = async (req, res) => {
-  console.log(req.body);
   try {
     const { title, youtube_channel } = req.body;
     if (!title || !youtube_channel)
@@ -86,7 +85,6 @@ exports.update = async (req, res) => {
 
     res.json({ message: "Record updated successfully" });
   } catch (error) {
-    console.error("Update Error:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

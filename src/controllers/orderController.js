@@ -50,7 +50,6 @@ exports.getOrderStatus = async (req, res) => {
     );
 
     const orderResultData = await orderStatusResponse.json();
-    console.log(orderResultData);
     const orderID = orderResultData.OrderNumber;
 
     if (orderResultData[0]?.Status === "00") {
@@ -261,7 +260,6 @@ exports.getOrderStatus = async (req, res) => {
       .status(500)
       .json({ status: 500, message: "Internal Server Error" });
   } catch (error) {
-    console.error("Error:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };

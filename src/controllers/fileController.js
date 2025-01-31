@@ -118,7 +118,6 @@ async function uploadPR(req, res) {
       });
     }
   } catch (error) {
-    console.error("Error during PR upload:", error);
     res.status(500).json({ error: "Something went wrong during PR upload." });
   }
 }

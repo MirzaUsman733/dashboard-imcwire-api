@@ -25,7 +25,6 @@ exports.handleStripeWebhook = async (req, res) => {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    console.log(session);
     if (session.payment_status === "paid") {
       const clientReferenceId = session.client_reference_id;
       const transactionId = session.id;
@@ -52,8 +51,6 @@ exports.handleStripeWebhook = async (req, res) => {
 
         const prId = prData[0].id;
         const userId = prData[0].user_id;
-        console.log(prId);
-        console.log(userId);
         if (paymentStatus === "paid") {
           // ✅ Update PR Status to "paid"
           await dbConnection.query(

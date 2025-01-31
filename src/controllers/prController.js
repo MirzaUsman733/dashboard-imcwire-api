@@ -513,7 +513,6 @@ exports.getSinglePRs = async (req, res) => {
       data: singlePRsWithTags,
     });
   } catch (error) {
-    console.error("Error in getSinglePRs:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -574,7 +573,6 @@ exports.getUserSinglePRs = async (req, res) => {
       data: singlePRsWithTags,
     });
   } catch (error) {
-    console.error("Error in getUserSinglePRs:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -621,7 +619,6 @@ exports.getUserPRStatusCounts = async (req, res) => {
       data: statusSummary,
     });
   } catch (error) {
-    console.error("Error in getUserPRStatusCounts:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -708,7 +705,6 @@ exports.getAllSinglePRs = async (req, res) => {
       data: singlePRs,
     });
   } catch (error) {
-    console.error("Error fetching Single PRs:", error); // Detailed error logging
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -913,7 +909,6 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
       single_pr_id: single_pr_id,
     });
   } catch (error) {
-    console.error("Error updating PR status and sending email:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();

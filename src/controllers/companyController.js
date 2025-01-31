@@ -160,45 +160,6 @@ exports.getAllCompanies = async (req, res) => {
   }
 };
 
-// ✅ **Super Admin: Get all companies of a specific user**
-// exports.getCompaniesByUserId = async (req, res) => {
-//   try {
-//     const { user_id } = req.query;
-
-//     if (!user_id) {
-//       return res.status(400).json({ message: "User ID is required" });
-//     }
-
-//     // Check if the user is a superAdmin
-//     const [user] = await connection.query(
-//       "SELECT role FROM auth_users WHERE id = ?",
-//       [user_id]
-//     );
-//     console.log(user)
-//     if (!user.length) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-
-//     const isSuperAdmin = user[0].role === "super_dmin";
-
-//     let companiesQuery = "SELECT * FROM companies ORDER BY created_at DESC";
-//     let queryParams = [];
-
-//     if (!isSuperAdmin) {
-//       // If not a superAdmin, fetch only the companies belonging to the user
-//       companiesQuery = "SELECT * FROM companies WHERE user_id = ? ORDER BY created_at DESC";
-//       queryParams = [user_id];
-//     }
-
-//     const [companies] = await connection.query(companiesQuery, queryParams);
-
-//     res.status(200).json(companies);
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Internal Server Error" });
-//   }
-// };
-
 // ✅ **Super Admin: Get company details by company ID**
 exports.getCompanyDetailsById = async (req, res) => {
   try {

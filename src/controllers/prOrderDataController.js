@@ -30,7 +30,6 @@ exports.submitPR = async (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
   let dbConnection;
-  console.log();
   try {
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction(); // Begin Transaction
@@ -132,7 +131,6 @@ exports.submitPR = async (req, res) => {
       );
     }
     let paymentUrl;
-    console.log(payment_method);
     if (payment_method === "Stripe") {
       // Stripe Checkout Session
       const session = await stripe.checkout.sessions.create({
@@ -169,7 +167,6 @@ exports.submitPR = async (req, res) => {
           }),
         }
       );
-      console.log(authResponse);
       if (!authResponse.ok) {
         return res.status(401).json({ message: "Authentication failed" });
       }
@@ -177,13 +174,11 @@ exports.submitPR = async (req, res) => {
       if (!token) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      console.log(token);
 
       const issueDate = new Date().toISOString().split("T")[0];
       const orderDueDate = new Date();
       orderDueDate.setDate(orderDueDate.getDate() + 1);
       const formattedOrderDueDate = orderDueDate.toISOString().split("T")[0];
-      console.log(username);
       const orderPayload = [
         { MerchantId: "NUXLAY" },
         {
@@ -209,9 +204,7 @@ exports.submitPR = async (req, res) => {
           body: JSON.stringify(orderPayload),
         }
       );
-      console.log("Order Response : ", orderResponse);
       const result = await orderResponse.json();
-      console.log("Response in Result : ", result);
       if (orderResponse.ok && result[0]?.Status === "00") {
         paymentUrl = `${result[1]?.Click2Pay}&callback_url=https://dashboard.imcwire.com/thankyou`;
       } else {
@@ -224,7 +217,6 @@ exports.submitPR = async (req, res) => {
     res.status(201).json({ message: "PR submitted successfully", paymentUrl });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
-    console.error("Error in submitPR:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -535,7 +527,6 @@ exports.submitCustomOrder = async (req, res) => {
       .json({ message: "Custom order submitted successfully", invoiceUrl });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
-    console.error("Error in submitCustomOrder:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -602,7 +593,6 @@ exports.getCustomOrder = async (req, res) => {
 
     res.status(200).json(response);
   } catch (error) {
-    console.error("Error in getCustomOrder:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
@@ -698,7 +688,6 @@ exports.deleteCustomOrder = async (req, res) => {
     });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
-    console.error("Error in deleteCustomOrder:", error);
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
