@@ -332,16 +332,51 @@ exports.superadminUpdateUser = async (req, res) => {
             to: targetUser.email,
             subject: "Important Account Notification",
             html: `
-              <h2>Dear ${targetUser.username},</h2>
-              <p>We regret to inform you that your IMCWire account has been permanently blocked due to violations of our Terms of Service.</p>
-              <h3>Implications:</h3>
-              <ul>
-                <li>Your access to all IMCWire services is revoked immediately.</li>
-                <li>Any subscriptions or services linked to your account are terminated.</li>
-                <li>This decision is final and binding.</li>
-              </ul>
-              <p>If you believe this decision is incorrect, please contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-              <p>Best Regards,<br>IMCWire Support Team</p>
+             <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permanent Account Suspension Notice</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+
+    <div style="background-color: #ffffff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        
+        <h2 style="color: #d9534f;">Dear ${targetUser.username},</h2>
+        
+        <p>We regret to inform you that your <strong>IMCWire</strong> account has been <strong>permanently blocked</strong> due to violations of our <a href="https://imcwire.com/terms-of-service/" target="_blank">Terms of Service</a>.</p>
+
+        <h3 style="color: #333;">Implications of This Action:</h3>
+        <ul>
+            <li><strong>Immediate Loss of Access:</strong> Your access to all IMCWire services has been revoked permanently.</li>
+            <li><strong>Termination of Services:</strong> Any active subscriptions, pending orders, or associated services have been canceled.</li>
+            <li><strong>Final Decision:</strong> This action is irreversible and binding.</li>
+        </ul>
+
+        <h3 style="color: #333;">Possible Reasons for This Action:</h3>
+        <ul>
+            <li>Repeated violations of IMCWire’s <a href="https://imcwire.com/guidelines/" target="_blank">content policies</a>.</li>
+            <li>Unauthorized activities, fraudulent transactions, or misuse of the platform.</li>
+            <li>Attempts to distribute misleading, false, or harmful content.</li>
+            <li>Violation of copyright, trademarks, or intellectual property rights.</li>
+            <li>Excessive spamming, abuse, or exploitation of system resources.</li>
+            <li>Engaging in illegal or unethical activities through our platform.</li>
+        </ul>
+
+        <p>If you believe this action was taken in error or require further clarification, you may contact our support team at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
+
+        <p>We appreciate your cooperation and compliance with our platform policies.</p>
+
+        <p><strong>Best Regards,</strong><br>IMCWire Support Team</p>
+
+        <p style="font-size: 12px; color: #777;">This is an automated message; please do not reply to this email. If you need assistance, contact our support team.</p>
+    
+    </div>
+
+</body>
+</html>
+
             `,
           };
           break;
@@ -352,16 +387,52 @@ exports.superadminUpdateUser = async (req, res) => {
             to: targetUser.email,
             subject: "Temporary Suspension of Your IMCWire Account",
             html: `
-              <h2>Dear ${targetUser.username},</h2>
-              <p>Your account has been temporarily blocked due to violations of our policies.</p>
-              <h3>Impact of Suspension:</h3>
-              <ul>
-                <li>You cannot access your IMCWire account during the suspension period.</li>
-                <li>Your account will be automatically reinstated after the suspension period.</li>
-              </ul>
-              <p>For more details, please review our <a href="https://imcwire.com/guidelines/">Guidelines</a>.</p>
-              <p>For further questions, contact us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-              <p>Best Regards,<br>IMCWire Support Team</p>
+             <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporary Suspension Notice</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+
+    <div style="background-color: #ffffff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        
+        <h2 style="color: #d9534f;">Dear ${targetUser.username},</h2>
+        
+        <p>We regret to inform you that your <strong>IMCWire</strong> account has been temporarily suspended due to a violation of our platform policies.</p>
+
+        <h3 style="color: #333;">Impact of Suspension:</h3>
+        <ul>
+            <li><strong>Restricted Access:</strong> You cannot access your IMCWire account during the suspension period.</li>
+            <li><strong>Service Limitation:</strong> All active submissions and pending press releases are temporarily on hold.</li>
+            <li><strong>Automatic Reinstatement:</strong> Your account will be automatically reinstated after the suspension period ends.</li>
+        </ul>
+
+        <h3 style="color: #333;">Possible Reasons for Suspension:</h3>
+        <ul>
+            <li>Violation of our <a href="https://imcwire.com/guidelines/" target="_blank">content guidelines</a>.</li>
+            <li>Multiple failed or unauthorized press release submissions.</li>
+            <li>Suspected fraudulent activity or policy abuse.</li>
+            <li>Excessive spamming or misusing the platform.</li>
+            <li>Unauthorized attempts to bypass system security.</li>
+        </ul>
+
+        <p>For more details, please review our <a href="https://imcwire.com/guidelines/" target="_blank">IMCWire Guidelines</a>.</p>
+
+        <p>If you believe this suspension was a mistake or require further clarification, please contact our support team at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
+
+        <p>We appreciate your cooperation in maintaining the integrity of our platform.</p>
+
+        <p><strong>Best Regards,</strong><br>IMCWire Support Team</p>
+
+        <p style="font-size: 12px; color: #777;">This is an automated message; please do not reply to this email. If you need assistance, contact our support team.</p>
+    
+    </div>
+
+</body>
+</html>
+
             `,
           };
           break;
@@ -372,10 +443,41 @@ exports.superadminUpdateUser = async (req, res) => {
             to: targetUser.email,
             subject: "User Activated on IMCWire Account",
             html: `
-              <h2>Dear ${targetUser.username},</h2>
-              <p>Your account has been reactivated successfully.</p>
-              <p>You can now access all services again.</p>
-              <p>Best Regards,<br>IMCWire Support Team</p>
+             <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Reactivation Notice</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+
+    <div style="background-color: #ffffff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        
+        <h2 style="color: #28a745;">Dear ${targetUser.username},</h2>
+        
+        <p>We are pleased to inform you that your <strong>IMCWire</strong> account has been successfully reactivated.</p>
+
+        <p>You can now log in and resume accessing all our services, including press release submissions, media distributions, and tracking analytics.</p>
+
+        <h3 style="color: #333;">What You Can Do Next:</h3>
+        <ul>
+            <li><strong>Access Your Dashboard:</strong> Manage your press releases and track your distributions.</li>
+            <li><strong>Schedule New Releases:</strong> Start publishing content again.</li>
+            <li><strong>Reach Out to Support:</strong> If you need any assistance, feel free to contact us.</li>
+        </ul>
+
+        <p>For any concerns or support inquiries, you can reach out to us at <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
+
+        <p><strong>Best Regards,</strong><br>IMCWire Support Team</p>
+
+        <p style="font-size: 12px; color: #777;">This is an automated message; please do not reply to this email. If you need assistance, contact our support team.</p>
+    
+    </div>
+
+</body>
+</html>
+
             `,
           };
           break;
@@ -386,10 +488,45 @@ exports.superadminUpdateUser = async (req, res) => {
             to: targetUser.email,
             subject: "Account Deletion Notification",
             html: `
-              <h2>Dear ${targetUser.username},</h2>
-              <p>Your IMCWire account has been deleted as per our records.</p>
-              <p>If this was a mistake or you need further assistance, please contact <a href="mailto:support@imcwire.com">support@imcwire.com</a>.</p>
-              <p>Best Regards,<br>IMCWire Support Team</p>
+             <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Termination Notice</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+
+    <div style="background-color: #ffffff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+        
+        <h2 style="color: #d9534f;">Dear ${targetUser.username},</h2>
+        
+        <p>We regret to inform you that your IMCWire account has been permanently deleted due to a violation of our <strong>Terms of Service and Policies</strong>. Our system has detected activity that does not comply with our guidelines, leading to this necessary action.</p>
+
+        <h3 style="color: #333;">Possible Reasons for Account Termination:</h3>
+        <ul>
+            <li>Unauthorized press release submissions or content manipulation.</li>
+            <li>Violation of copyright, trademarks, or intellectual property laws.</li>
+            <li>Submission of misleading or fraudulent information.</li>
+            <li>Abuse of our services, including spamming or excessive submissions.</li>
+            <li>Engagement in illegal, unethical, or harmful activities.</li>
+            <li>Use of false identities or misrepresentation of credentials.</li>
+            <li>Attempting to bypass platform security or abuse system loopholes.</li>
+        </ul>
+
+        <p>If you believe this action was taken in error or require further clarification, you may contact our support team within <strong>7 days</strong> at <a href="mailto:support@imcwire.com">support@imcwire.com</a>. However, please note that account reinstatement is subject to a thorough review and is not guaranteed.</p>
+
+        <p>We appreciate your understanding and compliance with our platform's policies.</p>
+
+        <p><strong>Best Regards,</strong><br>IMCWire Support Team</p>
+
+        <p style="font-size: 12px; color: #777;">This is an automated message; please do not reply to this email. If you need assistance, contact our support team.</p>
+    
+    </div>
+
+</body>
+</html>
+
             `,
           };
           break;
