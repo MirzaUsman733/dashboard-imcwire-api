@@ -7,8 +7,10 @@ const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 
 // Route to create an order
-// router.post("/stripe-checkout", paymentController.handleStripePayment);
-// router.post("/paypro-checkout", orderController.createOrder);
+router.post("/stripe-checkout", paymentController.handleStripePayment);
+
+// Route To Create Paypro Order
+router.post("/paypro-checkout", orderController.createOrder);
 // Route to check order status
 router.get("/checkOrderStatus", orderController.getOrderStatus);
 

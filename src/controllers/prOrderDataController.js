@@ -46,7 +46,7 @@ exports.submitPR = async (req, res) => {
 
     const userEmail = userResult[0].email;
     let username = userResult[0].username;
-    username = username.replace(/\d+/g, "").trim();
+    username = username.replace(/[^a-zA-Z\s]/g, "").trim();
     // ✅ 2. Check if the plan is activated
     const [planItem] = await dbConnection.query(
       "SELECT numberOfPR, activate_plan FROM plan_items WHERE id = ?",
