@@ -38,20 +38,46 @@ app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+// Press Release Routes
 app.use("/v1/pr", prRoutes);
+
+// Payment Routes
 app.use("/v1/payment", paymentRoutes);
+
+// Accounts Routes
 app.use("/v1/account", authRoutes);
+
+// IP Routes
 app.use("/v1/ip", ipRoutes);
+
+// Plans Routes
 app.use("/v1/plan", planRoutes);
+
+// Company Routes
 app.use("/v1/company", companyRoutes);
+
+// Coupons Routes
 app.use("/v1/coupon", couponRoutes);
+
+// Faq Routes
 app.use("/v1/faq", faqRoutes);
+
+// Notification Routes
 app.use("/v1/notification", notificationRoutes);
+
+// Reports Routes
 app.use("/v1/reports", reportRoutes);
+
+// How It Works Routes
 app.use("/v1/how-it-works", howItWorksRoutes);
+
+// File Check Routes
 // app.use("/v1/files", fileRoutes);
 
+// Project Port
 const PORT = process.env.PORT || 3008;
+
+// Project Listen
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

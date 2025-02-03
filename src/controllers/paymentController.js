@@ -140,7 +140,6 @@ exports.addCustomPayment = async (req, res) => {
       return res.status(400).json({ error: `PR ID ${prId} does not exist.` });
     }
 
-
     // ✅ Update PR Status to "paid"
     await dbConnection.query(
       "UPDATE pr_data SET payment_status = 'paid' WHERE id = ?",
@@ -212,7 +211,6 @@ exports.addCustomPayment = async (req, res) => {
       .status(200)
       .json({ message: "Manual payment added successfully" });
   } catch (error) {
-
     if (dbConnection) {
       await dbConnection.rollback();
     }

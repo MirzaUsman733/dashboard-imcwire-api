@@ -11,12 +11,14 @@ router.post(
   apiKeyMiddleware,
   planController.createPlan
 );
+
 router.put(
   "/update",
   SuperAdminAuthMiddleware,
   apiKeyMiddleware,
   planController.updatePlan
 );
+
 router.delete(
   "/delete",
   SuperAdminAuthMiddleware,
@@ -24,8 +26,12 @@ router.delete(
   planController.deletePlan
 );
 
+
 // Public route
 router.get("/list", apiKeyMiddleware, planController.getPlans);
+
+router.get("/active-plans", apiKeyMiddleware, planController.getActivePlans);
+
 // New route for getting a single plan by ID
 router.get("/single/:id", apiKeyMiddleware, planController.getPlanById);
 module.exports = router;

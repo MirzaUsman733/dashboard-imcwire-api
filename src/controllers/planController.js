@@ -140,6 +140,29 @@ exports.getPlans = async (req, res) => {
   }
 };
 
+exports.getActivePlans = async (req, res) => {
+  try {
+    // Define the query to select only id and name of active plans
+    let query = `
+      SELECT id, planName 
+      FROM plan_items 
+      WHERE activate_plan = 1 
+      ORDER BY created_at DESC
+    `;
+
+    // Execute the query
+    const [plans] = await connection.query(query);
+
+    // Return the results in JSON format
+    res.status(200).json(plans);
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+};
+
 // Delete a plan (Admin Only)
 exports.deletePlan = async (req, res) => {
   try {
