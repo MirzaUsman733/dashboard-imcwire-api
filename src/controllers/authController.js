@@ -2,24 +2,20 @@ const connection = require("../config/dbconfig");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
+const { default: transporter } = require("../config/transporter");
 require("dotenv").config();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+
 // Register a new user with role
 exports.registerUser = async (req, res) => {
   const { username, email, password, role, isAgency } = req.body;
+  let dbConnection;
 
   try {
-    const [existingUser] = await connection.query(
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction(); // Begin Transaction
+
+    const [existingUser] = await dbConnection.query(
       "SELECT * FROM auth_user WHERE email = ?",
       [email]
     );
@@ -30,7 +26,7 @@ exports.registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    const result = await connection.query(
+    const [result] = await dbConnection.query(
       "INSERT INTO auth_user (username, email, password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?)",
       [
         username,
@@ -41,11 +37,10 @@ exports.registerUser = async (req, res) => {
         "active",
       ]
     );
-    // Define expiration time (1 day from now)
-    const expiresInSeconds = 24 * 60 * 60; // 1 day in seconds
-    const expirationTimestamp =
-      Math.floor(Date.now() / 1000) + expiresInSeconds; // Current time + 1 day
-    const userId = result[0].insertId;
+
+    const expiresInSeconds = 7 * 24 * 60 * 60;
+    const expirationTimestamp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+    const userId = result.insertId;
 
     const token = jwt.sign(
       { id: userId, email, role, isAgency, expire: expirationTimestamp },
@@ -54,55 +49,27 @@ exports.registerUser = async (req, res) => {
         expiresIn: "7d",
       }
     );
+
     const mailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
       to: email,
       subject: "Welcome to IMCWire",
       html: `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to IMCWire</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px;">
-
-        <div style="background-color: #fff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
-            <h2 style="color: #333; font-weight: bold;">Dear ${username},</h2>
-            <p>Welcome to the IMCWire family! We're thrilled to have you on board and eager to collaborate in amplifying your message globally.</p>
-            <p>With a decade of expertise in press release distribution, IMCWire is dedicated to linking you with premier media outlets and organizations, ensuring your news reaches its target audience effectively. Our network boasts esteemed platforms such as Yahoo Finance, Bloomberg, MarketWatch, and over 350 other prominent news and media channels.</p>
-            
-            <h3 style="color: #333; font-weight: bold;">As a member, here's what you can anticipate:</h3>
-            <ul>
-                <li>Extensive Distribution: Your press releases will reach leading news outlets, maximizing visibility.</li>
-                <li>Tailored Plans: Choose from our plans, and Corporate plans to suit your visibility and influence requirements.</li>
-                <li>Professional Support: Our team is available to guide you every step of the way, from crafting your press release to analyzing its impact.</li>
-            </ul>
-            
-            <h3 style="color: #333; font-weight: bold;">To kick-start your IMCWire experience, we suggest the following steps:</h3>
-            <ol>
-                <li>Explore Your Dashboard: Log in to your account to manage your press releases and track performance.</li>
-                <li>Schedule Your First Release: Ready to go live? Submit your debut press release through your dashboard or contact our support team for assistance.</li>
-                <li>Reach Out: Questions or need help? Our dedicated support team is just an email or phone call away.</li>
-            </ol>
-            
-            <p><strong>Thank you for choosing IMCWire. We're honored to be part of your journey and committed to ensuring your voice resonates worldwide.</p>
-            
-            <p><strong>Let's make headlines together!</strong></p>
-            <div class="display: flex; justify-content: space-between; ">
-            <div>Warm regards,</div>
-            <div>The IMCWire Team</div>
-            </div>
-          
-        </div>
-
+        <html>
+        <body>
+          <div style="background-color: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+            <h2>Dear ${username},</h2>
+            <p>Welcome to the IMCWire family!</p>
+            <p>Thank you for registering. Your press release distribution journey starts now.</p>
+            <p>Explore your dashboard and start submitting press releases today.</p>
+            <p>Best regards,<br/>The IMCWire Team</p>
+          </div>
         </body>
         </html>
-    `,
+      `,
     };
-
     await transporter.sendMail(mailOptions);
+
     const adminEmails = ["admin@imcwire.com", "imcwirenotifications@gmail.com"];
     const adminMailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
@@ -112,6 +79,8 @@ exports.registerUser = async (req, res) => {
     };
     await transporter.sendMail(adminMailOptions);
 
+    await dbConnection.commit(); // Commit transaction
+    
     res.status(201).json({
       message: "User registered successfully",
       token,
@@ -123,9 +92,13 @@ exports.registerUser = async (req, res) => {
       isActive: true,
     });
   } catch (error) {
+    if (dbConnection) await dbConnection.rollback(); // Rollback on error
     res.status(500).json({ error: "Error registering user" });
+  } finally {
+    if (dbConnection) dbConnection.release(); // Release connection
   }
 };
+
 
 // Login user
 exports.loginUser = async (req, res) => {
@@ -288,165 +261,165 @@ exports.resetPassword = async (req, res) => {
 };
 
 // Update User API with Status Change Notifications
-exports.updateUser = async (req, res) => {
-  const { id } = req.user;
-  const {
-    username,
-    currentPassword,
-    newPassword,
-    isAgency,
-    full_name,
-    image_url,
-    street_address,
-    city,
-    country,
-    zip_code,
-    phone_number,
-    gender,
-    date_of_birth,
-  } = req.body;
+// exports.updateUser = async (req, res) => {
+//   const { id } = req.user;
+//   const {
+//     username,
+//     currentPassword,
+//     newPassword,
+//     isAgency,
+//     full_name,
+//     image_url,
+//     street_address,
+//     city,
+//     country,
+//     zip_code,
+//     phone_number,
+//     gender,
+//     date_of_birth,
+//   } = req.body;
 
-  const userUpdates = {};
-  const profileUpdates = {};
+//   const userUpdates = {};
+//   const profileUpdates = {};
 
-  try {
-    // Fetch user from auth_user
-    const [users] = await connection.query(
-      "SELECT * FROM auth_user WHERE auth_user_id = ?",
-      [id]
-    );
-    const user = users[0];
+//   try {
+//     // Fetch user from auth_user
+//     const [users] = await connection.query(
+//       "SELECT * FROM auth_user WHERE auth_user_id = ?",
+//       [id]
+//     );
+//     const user = users[0];
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
 
-    // Update username
-    if (username) {
-      userUpdates.username = username;
-    }
+//     // Update username
+//     if (username) {
+//       userUpdates.username = username;
+//     }
 
-    // Update password (requires current password)
-    if (newPassword) {
-      if (!currentPassword) {
-        return res.status(400).json({
-          message: "Current password is required to update the password",
-        });
-      }
+//     // Update password (requires current password)
+//     if (newPassword) {
+//       if (!currentPassword) {
+//         return res.status(400).json({
+//           message: "Current password is required to update the password",
+//         });
+//       }
 
-      const isPasswordValid = await bcrypt.compare(
-        currentPassword,
-        user.password
-      );
-      if (!isPasswordValid) {
-        return res
-          .status(400)
-          .json({ message: "Current password is incorrect" });
-      }
+//       const isPasswordValid = await bcrypt.compare(
+//         currentPassword,
+//         user.password
+//       );
+//       if (!isPasswordValid) {
+//         return res
+//           .status(400)
+//           .json({ message: "Current password is incorrect" });
+//       }
 
-      const salt = await bcrypt.genSalt(10);
-      userUpdates.password = await bcrypt.hash(newPassword, salt);
-    }
+//       const salt = await bcrypt.genSalt(10);
+//       userUpdates.password = await bcrypt.hash(newPassword, salt);
+//     }
 
-    // Update isAgency status
-    if (isAgency !== undefined) {
-      userUpdates.isAgency = isAgency;
-    }
+//     // Update isAgency status
+//     if (isAgency !== undefined) {
+//       userUpdates.isAgency = isAgency;
+//     }
 
-    // Update user details in auth_user if any changes exist
-    if (Object.keys(userUpdates).length > 0) {
-      const query = Object.keys(userUpdates)
-        .map((key) => `${key} = ?`)
-        .join(", ");
-      const values = Object.values(userUpdates);
-      values.push(id);
+//     // Update user details in auth_user if any changes exist
+//     if (Object.keys(userUpdates).length > 0) {
+//       const query = Object.keys(userUpdates)
+//         .map((key) => `${key} = ?`)
+//         .join(", ");
+//       const values = Object.values(userUpdates);
+//       values.push(id);
 
-      await connection.query(
-        `UPDATE auth_user SET ${query} WHERE auth_user_id = ?`,
-        values
-      );
-    }
+//       await connection.query(
+//         `UPDATE auth_user SET ${query} WHERE auth_user_id = ?`,
+//         values
+//       );
+//     }
 
-    // Check if user profile exists
-    const [profile] = await connection.query(
-      "SELECT * FROM user_profile WHERE user_id = ?",
-      [id]
-    );
+//     // Check if user profile exists
+//     const [profile] = await connection.query(
+//       "SELECT * FROM user_profile WHERE user_id = ?",
+//       [id]
+//     );
 
-    // Prepare profile updates
-    if (full_name) profileUpdates.full_name = full_name;
-    if (image_url) profileUpdates.image_url = image_url;
-    if (street_address) profileUpdates.street_address = street_address;
-    if (city) profileUpdates.city = city;
-    if (country) profileUpdates.country = country;
-    if (zip_code) profileUpdates.zip_code = zip_code;
-    if (phone_number) profileUpdates.phone_number = phone_number;
-    if (gender) profileUpdates.gender = gender;
-    if (date_of_birth) profileUpdates.date_of_birth = date_of_birth;
+//     // Prepare profile updates
+//     if (full_name) profileUpdates.full_name = full_name;
+//     if (image_url) profileUpdates.image_url = image_url;
+//     if (street_address) profileUpdates.street_address = street_address;
+//     if (city) profileUpdates.city = city;
+//     if (country) profileUpdates.country = country;
+//     if (zip_code) profileUpdates.zip_code = zip_code;
+//     if (phone_number) profileUpdates.phone_number = phone_number;
+//     if (gender) profileUpdates.gender = gender;
+//     if (date_of_birth) profileUpdates.date_of_birth = date_of_birth;
 
-    if (profile.length > 0) {
-      // Update existing profile
-      if (Object.keys(profileUpdates).length > 0) {
-        const profileQuery = Object.keys(profileUpdates)
-          .map((key) => `${key} = ?`)
-          .join(", ");
-        const profileValues = Object.values(profileUpdates);
-        profileValues.push(id);
+//     if (profile.length > 0) {
+//       // Update existing profile
+//       if (Object.keys(profileUpdates).length > 0) {
+//         const profileQuery = Object.keys(profileUpdates)
+//           .map((key) => `${key} = ?`)
+//           .join(", ");
+//         const profileValues = Object.values(profileUpdates);
+//         profileValues.push(id);
 
-        await connection.query(
-          `UPDATE user_profile SET ${profileQuery} WHERE user_id = ?`,
-          profileValues
-        );
-      }
-    } else {
-      // Create a new profile if it doesn't exist
-      if (Object.keys(profileUpdates).length > 0) {
-        await connection.query(
-          `INSERT INTO user_profile (user_id, full_name, image_url, street_address, city, country, zip_code, phone_number, gender, date_of_birth)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            id,
-            full_name,
-            image_url,
-            street_address,
-            city,
-            country,
-            zip_code,
-            phone_number,
-            gender,
-            date_of_birth,
-          ]
-        );
-      }
-    }
+//         await connection.query(
+//           `UPDATE user_profile SET ${profileQuery} WHERE user_id = ?`,
+//           profileValues
+//         );
+//       }
+//     } else {
+//       // Create a new profile if it doesn't exist
+//       if (Object.keys(profileUpdates).length > 0) {
+//         await connection.query(
+//           `INSERT INTO user_profile (user_id, full_name, image_url, street_address, city, country, zip_code, phone_number, gender, date_of_birth)
+//           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+//           [
+//             id,
+//             full_name,
+//             image_url,
+//             street_address,
+//             city,
+//             country,
+//             zip_code,
+//             phone_number,
+//             gender,
+//             date_of_birth,
+//           ]
+//         );
+//       }
+//     }
 
-    // Send Email Notification for Password Change
-    if (newPassword) {
-      const mailOptions = {
-        from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-        to: user.email,
-        subject: "Your Password Has Been Changed - IMCWire",
-        html: `
-          <h2>Password Changed Successfully</h2>
-          <p>Dear ${user.username},</p>
-          <p>Your password has been successfully updated. If you did not request this change, please contact our support team immediately.</p>
-          <p><strong>Email:</strong> ${user.email}</p>
-          <p>For security reasons, we recommend updating your password regularly.</p>
-          <p>Best Regards,<br>IMCWire Support Team</p>
-        `,
-      };
-      await transporter.sendMail(mailOptions);
-    }
+//     // Send Email Notification for Password Change
+//     if (newPassword) {
+//       const mailOptions = {
+//         from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+//         to: user.email,
+//         subject: "Your Password Has Been Changed - IMCWire",
+//         html: `
+//           <h2>Password Changed Successfully</h2>
+//           <p>Dear ${user.username},</p>
+//           <p>Your password has been successfully updated. If you did not request this change, please contact our support team immediately.</p>
+//           <p><strong>Email:</strong> ${user.email}</p>
+//           <p>For security reasons, we recommend updating your password regularly.</p>
+//           <p>Best Regards,<br>IMCWire Support Team</p>
+//         `,
+//       };
+//       await transporter.sendMail(mailOptions);
+//     }
 
-    res.status(200).json({
-      message: "User and profile updated successfully",
-      userUpdates,
-      profileUpdates,
-    });
-  } catch (error) {
-    res.status(500).json({ error: "Error updating user" });
-  }
-};
+//     res.status(200).json({
+//       message: "User and profile updated successfully",
+//       userUpdates,
+//       profileUpdates,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ error: "Error updating user" });
+//   }
+// };
 
 // ✅ **Superadmin-Only API to Change Role & Status**
 exports.superadminUpdateUser = async (req, res) => {
@@ -614,6 +587,180 @@ exports.superadminUpdateUser = async (req, res) => {
     return res.status(500).json({ error: "Error updating user role/status" });
   }
 };
+
+exports.updateUser = async (req, res) => {
+  const { id } = req.user;
+  const {
+    username,
+    currentPassword,
+    newPassword,
+    isAgency,
+    full_name,
+    image_url,
+    street_address,
+    city,
+    country,
+    zip_code,
+    phone_number,
+    gender,
+    date_of_birth,
+  } = req.body;
+
+  const userUpdates = {};
+  const profileUpdates = {};
+
+  let dbConnection;
+
+  try {
+    dbConnection = await connection.getConnection(); // Get a DB connection from the pool
+    await dbConnection.beginTransaction(); // Start a transaction
+
+    // Fetch user from auth_user
+    const [users] = await dbConnection.query(
+      "SELECT * FROM auth_user WHERE auth_user_id = ?",
+      [id]
+    );
+    const user = users[0];
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update username
+    if (username) {
+      userUpdates.username = username;
+    }
+
+    // Update password (requires current password)
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          message: "Current password is required to update the password",
+        });
+      }
+
+      const isPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.password
+      );
+      if (!isPasswordValid) {
+        return res
+          .status(400)
+          .json({ message: "Current password is incorrect" });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      userUpdates.password = await bcrypt.hash(newPassword, salt);
+    }
+
+    // Update isAgency status
+    if (isAgency !== undefined) {
+      userUpdates.isAgency = isAgency;
+    }
+
+    // Update user details in auth_user if any changes exist
+    if (Object.keys(userUpdates).length > 0) {
+      const query = Object.keys(userUpdates)
+        .map((key) => `${key} = ?`)
+        .join(", ");
+      const values = Object.values(userUpdates);
+      values.push(id);
+
+      await dbConnection.query(
+        `UPDATE auth_user SET ${query} WHERE auth_user_id = ?`,
+        values
+      );
+    }
+
+    // Check if user profile exists
+    const [profile] = await dbConnection.query(
+      "SELECT * FROM user_profile WHERE user_id = ?",
+      [id]
+    );
+
+    // Prepare profile updates
+    if (full_name) profileUpdates.full_name = full_name;
+    if (image_url) profileUpdates.image_url = image_url;
+    if (street_address) profileUpdates.street_address = street_address;
+    if (city) profileUpdates.city = city;
+    if (country) profileUpdates.country = country;
+    if (zip_code) profileUpdates.zip_code = zip_code;
+    if (phone_number) profileUpdates.phone_number = phone_number;
+    if (gender) profileUpdates.gender = gender;
+    if (date_of_birth) profileUpdates.date_of_birth = date_of_birth;
+
+    if (profile.length > 0) {
+      // Update existing profile
+      if (Object.keys(profileUpdates).length > 0) {
+        const profileQuery = Object.keys(profileUpdates)
+          .map((key) => `${key} = ?`)
+          .join(", ");
+        const profileValues = Object.values(profileUpdates);
+        profileValues.push(id);
+
+        await dbConnection.query(
+          `UPDATE user_profile SET ${profileQuery} WHERE user_id = ?`,
+          profileValues
+        );
+      }
+    } else {
+      // Create a new profile if it doesn't exist
+      if (Object.keys(profileUpdates).length > 0) {
+        await dbConnection.query(
+          `INSERT INTO user_profile (user_id, full_name, image_url, street_address, city, country, zip_code, phone_number, gender, date_of_birth)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+
+          [
+            id,
+            full_name || null,
+            image_url || null,
+            street_address || null,
+            city || null,
+            country || null,
+            zip_code || null,
+            phone_number || null,
+            gender || null,
+            date_of_birth || null,
+          ]
+        );
+      }
+    }
+
+    // Commit transaction after all operations are successful
+    await dbConnection.commit();
+
+    // Send Email Notification for Password Change
+    if (newPassword) {
+      const mailOptions = {
+        from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+        to: user.email,
+        subject: "Your Password Has Been Changed - IMCWire",
+        html: `
+          <h2>Password Changed Successfully</h2>
+          <p>Dear ${user.username},</p>
+          <p>Your password has been successfully updated. If you did not request this change, please contact our support team immediately.</p>
+          <p><strong>Email:</strong> ${user.email}</p>
+          <p>For security reasons, we recommend updating your password regularly.</p>
+          <p>Best Regards,<br>IMCWire Support Team</p>
+        `,
+      };
+      await transporter.sendMail(mailOptions);
+    }
+
+    res.status(200).json({
+      message: "User and profile updated successfully",
+      userUpdates,
+      profileUpdates,
+    });
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback(); // Rollback changes if error occurs
+    res.status(500).json({ error: "Error updating user", details: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release(); // Release connection back to pool
+  }
+};
+
+
 
 // ✅ Add User Profile API
 exports.addUserProfile = async (req, res) => {

@@ -5,16 +5,8 @@ const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const os = require("os");
-const nodemailer = require("nodemailer");
-const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "Orders@imcwire.com",
-    pass: "Sales@$$1aShahG!!boy,s",
-  },
-});
+const { transporter } = require("../config/transporter");
+
 // Submit Single PR
 exports.submitSinglePR = async (req, res) => {
   let dbConnection;

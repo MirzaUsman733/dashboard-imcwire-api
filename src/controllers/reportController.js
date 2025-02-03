@@ -5,6 +5,7 @@ const connection = require("../config/dbconfig");
 const ftpConfig = require("../config/ftpConfig");
 const streamifier = require("streamifier");
 const nodemailer = require("nodemailer");
+const { transporter } = require("../config/transporter");
 // ✅ Configure Multer for File Uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -38,15 +39,7 @@ const uploadToFTP = async (fileBuffer, fileName, folderPath, retries = 3) => {
     throw new Error("FTP Upload Failed");
   }
 };
-const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "Orders@imcwire.com",
-    pass: "Sales@$$1aShahG!!boy,s",
-  },
-});
+
 // ✅ Delete Old File from FTP
 const deleteFromFTP = async (filePath) => {
   if (!filePath) return;
@@ -286,7 +279,6 @@ exports.createFullReport = async (req, res) => {
         &copy; 2025 IMCWire. All rights reserved.
     </div>
 </div>
-
 </body>
 </html>
 

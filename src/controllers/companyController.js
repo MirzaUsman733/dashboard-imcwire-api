@@ -2,6 +2,8 @@ const connection = require("../config/dbconfig");
 
 // ✅ **Create a new company (Admin Only)**
 exports.createCompany = async (req, res) => {
+  let dbConnection;
+
   try {
     const {
       companyName,
@@ -20,34 +22,53 @@ exports.createCompany = async (req, res) => {
       return res.status(400).json({ message: "Company name is required" });
     }
 
-    const [result] = await connection.query(
-      "INSERT INTO companies (user_id, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    dbConnection = await connection.getConnection(); // Get a DB connection from the pool
+    await dbConnection.beginTransaction(); // Start a transaction
+
+    const [result] = await dbConnection.query(
+      `INSERT INTO companies 
+      (user_id, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
-        companyName,
-        address1,
-        address2,
-        contactName,
-        phone,
-        email,
-        country,
-        city,
-        state,
-        websiteUrl,
+        companyName || null,
+        address1 || null,
+        address2 || null,
+        contactName || null,
+        phone || null,
+        email || null,
+        country || null,
+        city || null,
+        state || null,
+        websiteUrl || null,
       ]
     );
 
+    const companyId = result.insertId;
+
+    // Commit transaction after successful company creation
+    await dbConnection.commit();
+
     res.status(201).json({
       message: "Company added successfully",
-      companyId: result.insertId,
+      companyId,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    if (dbConnection) await dbConnection.rollback(); // Rollback transaction if an error occurs
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  } finally {
+    if (dbConnection) dbConnection.release(); // Release connection back to the pool
   }
 };
 
+
 // ✅ **Update an existing company (Admin Only, but only the owner can update)**
 exports.updateCompany = async (req, res) => {
+  let dbConnection;
+
   try {
     const { id, ...updatedData } = req.body;
 
@@ -55,8 +76,11 @@ exports.updateCompany = async (req, res) => {
       return res.status(400).json({ message: "Company ID is required" });
     }
 
-    // Check if the company belongs to the authenticated user
-    const [company] = await connection.query(
+    dbConnection = await connection.getConnection(); // Get a DB connection from the pool
+    await dbConnection.beginTransaction(); // Start a transaction
+
+    // Check if the company exists and belongs to the authenticated user
+    const [company] = await dbConnection.query(
       "SELECT user_id FROM companies WHERE id = ?",
       [id]
     );
@@ -66,11 +90,10 @@ exports.updateCompany = async (req, res) => {
     }
 
     if (company[0].user_id !== req.user.id) {
-      return res
-        .status(403)
-        .json({ message: "Unauthorized to update this company" });
+      return res.status(403).json({ message: "Unauthorized to update this company" });
     }
 
+    // Prepare dynamic query for updating only provided fields
     const queryParts = [];
     const values = [];
 
@@ -81,30 +104,46 @@ exports.updateCompany = async (req, res) => {
 
     values.push(id);
 
-    await connection.query(
-      `UPDATE companies SET ${queryParts.join(", ")} WHERE id = ?`,
-      values
-    );
+    if (queryParts.length > 0) {
+      await dbConnection.query(
+        `UPDATE companies SET ${queryParts.join(", ")} WHERE id = ?`,
+        values
+      );
+    }
+
+    // Commit transaction after a successful update
+    await dbConnection.commit();
 
     res.status(200).json({ message: "Company updated successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    if (dbConnection) await dbConnection.rollback(); // Rollback if any error occurs
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release(); // Release the connection back to the pool
   }
 };
 
+
 // ✅ **Get all companies for the authenticated user**
 exports.getUserCompanies = async (req, res) => {
+  let dbConnection;
+
   try {
-    const [companies] = await connection.query(
+    dbConnection = await connection.getConnection(); // Get a DB connection from the pool
+
+    const [companies] = await dbConnection.query(
       "SELECT * FROM companies WHERE user_id = ? ORDER BY created_at DESC",
       [req.user.id]
     );
 
     res.status(200).json(companies);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release(); // Release the connection back to the pool
   }
 };
+
 
 // ✅ **Get company details by ID**
 exports.getCompanyById = async (req, res) => {

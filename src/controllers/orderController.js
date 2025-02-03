@@ -1,57 +1,141 @@
 const connection = require("../config/dbconfig");
-const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
+const { transporter } = require("../config/transporter");
 require("dotenv").config();
-
-const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "Orders@imcwire.com",
-    pass: "Sales@$$1aShahG!!boy,s",
-  },
-});
 
 // Utility function to sanitize the name: remove any characters that are not letters or spaces
 const sanitizeName = (name) => {
   return name.replace(/[^a-zA-Z\s]/g, "");
 };
 
+// exports.createOrder = async (req, res) => {
+//   try {
+//     let { name, email, totalPrice, address } = req.body;
+
+//     // Sanitize the user's name to remove special characters and numbers
+//     name = sanitizeName(name);
+
+//     // Generate a unique client ID on the server side
+//     const clientId = uuidv4();
+//     // Authenticate and get the token
+//     const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify({
+//         clientid: process.env.clientid,
+//         clientsecret: process.env.clientsecret,
+//       }),
+//     });
+//     console.log(authResponse);
+//     if (!authResponse.ok) {
+//       return res.status(401).json({ message: "Authentication failed" });
+//     }
+//     const authResult = await authResponse.text();
+//     const token = authResponse.headers.get("Token");
+//     if (authResult === "Authorized" || !token) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
+//     const issueDate = new Date();
+//     const orderDueDate = new Date(issueDate);
+//     orderDueDate.setDate(issueDate.getDate() + 1);
+//     const formattedIssueDate = issueDate.toISOString().split("T")[0];
+//     const formattedOrderDueDate = orderDueDate.toISOString().split("T")[0];
+//     const orderPayload = [
+//       { MerchantId: "NUXLAY" },
+//       {
+//         OrderNumber: clientId,
+//         CurrencyAmount: `${totalPrice}.00`,
+//         Currency: "USD",
+//         OrderDueDate: formattedOrderDueDate,
+//         OrderType: "Service",
+//         IsConverted: "true",
+//         IssueDate: formattedIssueDate,
+//         OrderExpireAfterSeconds: "0",
+//         CustomerName: name,
+//         CustomerMobile: "",
+//         CustomerEmail: email,
+//         CustomerAddress: address,
+//       },
+//     ];
+//     console.log(orderPayload);
+//     // Create order using the token
+//     const orderResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/co`, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//         Token: token,
+//       },
+//       body: JSON.stringify(orderPayload),
+//     });
+//     console.log(orderResponse);
+//     const result = await orderResponse.json();
+//     console.log("Result :", result);
+//     if (orderResponse.ok && result[0]?.Status === "00") {
+//       const click2PayUrl = result[1]?.Click2Pay;
+//       if (click2PayUrl) {
+//         const finalUrl = `${click2PayUrl}&callback_url=https://dashboard.imcwire.com/thankyou`;
+//         return res.json({ finalUrl });
+//       } else {
+//         return res.status(500).json({ message: "Click2Pay URL not found" });
+//       }
+//     } else {
+//       return res.status(500).json({ message: "Order creation failed" });
+//     }
+//   } catch (error) {
+//     console.error("Error:", error);
+//     return res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
 exports.createOrder = async (req, res) => {
+  let dbConnection;
+
   try {
     let { name, email, totalPrice, address } = req.body;
+
+    if (!name || !email || !totalPrice || !address) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
 
     // Sanitize the user's name to remove special characters and numbers
     name = sanitizeName(name);
 
     // Generate a unique client ID on the server side
     const clientId = uuidv4();
-    // Authenticate and get the token
+
+    dbConnection = await connection.getConnection(); // Get a DB connection from the pool
+    await dbConnection.beginTransaction(); // Start a transaction
+
+    // ✅ **Authenticate and get the token**
     const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         clientid: process.env.clientid,
         clientsecret: process.env.clientsecret,
       }),
     });
-    console.log(authResponse);
+
     if (!authResponse.ok) {
+      await dbConnection.rollback();
       return res.status(401).json({ message: "Authentication failed" });
     }
-    const authResult = await authResponse.text();
+
     const token = authResponse.headers.get("Token");
-    if (authResult === "Authorized" || !token) {
-      return res.status(401).json({ message: "Unauthorized" });
+    if (!token) {
+      await dbConnection.rollback();
+      return res.status(401).json({ message: "Unauthorized: Token not received." });
     }
+
     const issueDate = new Date();
     const orderDueDate = new Date(issueDate);
     orderDueDate.setDate(issueDate.getDate() + 1);
+
     const formattedIssueDate = issueDate.toISOString().split("T")[0];
     const formattedOrderDueDate = orderDueDate.toISOString().split("T")[0];
+
     const orderPayload = [
       { MerchantId: "NUXLAY" },
       {
@@ -69,8 +153,8 @@ exports.createOrder = async (req, res) => {
         CustomerAddress: address,
       },
     ];
-    console.log(orderPayload);
-    // Create order using the token
+
+    // ✅ **Create Order using the Token**
     const orderResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/co`, {
       method: "POST",
       headers: {
@@ -79,25 +163,35 @@ exports.createOrder = async (req, res) => {
       },
       body: JSON.stringify(orderPayload),
     });
-    console.log(orderResponse);
+
     const result = await orderResponse.json();
-    console.log("Result :", result);
+
     if (orderResponse.ok && result[0]?.Status === "00") {
       const click2PayUrl = result[1]?.Click2Pay;
       if (click2PayUrl) {
         const finalUrl = `${click2PayUrl}&callback_url=https://dashboard.imcwire.com/thankyou`;
+
+        await dbConnection.commit();
+        dbConnection.release();
+
         return res.json({ finalUrl });
       } else {
+        await dbConnection.rollback();
         return res.status(500).json({ message: "Click2Pay URL not found" });
       }
     } else {
+      await dbConnection.rollback();
       return res.status(500).json({ message: "Order creation failed" });
     }
   } catch (error) {
+    if (dbConnection) await dbConnection.rollback(); // Rollback if an error occurs
+    if (dbConnection) dbConnection.release(); // Ensure the connection is released
+
     console.error("Error:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 exports.getOrderStatus = async (req, res) => {
   try {

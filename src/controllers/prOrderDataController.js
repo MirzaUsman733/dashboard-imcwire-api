@@ -29,6 +29,13 @@ exports.submitPR = async (req, res) => {
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
+  // If the total amount is greater than $250, only allow Stripe
+  if (total_price > 250 && payment_method === "Paypro") {
+    return res.status(400).json({
+      message: "For transactions above $250, only Stripe is allowed.",
+    });
+  }
+
   let dbConnection;
   try {
     dbConnection = await connection.getConnection();

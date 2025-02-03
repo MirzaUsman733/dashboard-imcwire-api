@@ -10,8 +10,8 @@ exports.createPlan = async (req, res) => {
       planDescription,
       pdfLink,
       numberOfPR,
-      activate_plan = true, // Default to true if not provided
-      type = "package", // Default to "package" if not provided
+      activate_plan = true,
+      type = "package",
     } = req.body;
 
     if (!planName || !totalPlanPrice || !priceSingle || !numberOfPR) {

@@ -1,17 +1,8 @@
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 const connection = require("../config/dbconfig");
-const nodemailer = require("nodemailer");
+const { transporter } = require("../config/transporter");
 
 const endpointSecret = process.env.EXPRESS_STRIPE_WEBHOOK_SECRET;
-const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "Orders@imcwire.com",
-    pass: "Sales@$$1aShahG!!boy,s",
-  },
-});
 
 exports.handleStripeWebhook = async (req, res) => {
   const sig = req.headers["stripe-signature"];
@@ -138,8 +129,7 @@ exports.handleStripeWebhook = async (req, res) => {
               <p>We're thrilled to have you with us and look forward to supporting your success. Here's to making headlines together!</p>
   
               <p><strong>Warm regards,</strong><br>The IMCWire Team</p>
-          </div>
-  
+          </div>  
           </body>
           </html>
       `,
