@@ -6,6 +6,7 @@ const prOrderDataController = require("../controllers/prOrderDataController");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 const multer = require("multer");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 // ✅ Multer Configuration: Only to Parse Form-Data, No Local Storage
 const upload = multer();
 
@@ -43,22 +44,22 @@ router.get(
 // ✅ One API to insert all data at once
 router.delete(
   "/custom-order/:orderId",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prOrderDataController.deleteCustomOrder
 );
 
 router.get(
   "/user-order-list",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   prOrderDataController.getUserPRs
 );
 
 router.get(
   "/user-order/:userId",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prOrderDataController.getUserPRsById
 );
 
@@ -71,16 +72,16 @@ router.get(
 
 router.put(
   "/superadmin/update-order-status/:prId",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prOrderDataController.updatePROrderStatusBySuperAdmin
 );
 
 // ✅ Handle `Self-Written` (File Upload to FTP) & `IMCWire-Written` (JSON Body)
 router.post(
   "/submit-single-pr",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   checkFileUpload,
   prController.submitSinglePR
 );
@@ -88,73 +89,73 @@ router.post(
 // ✅ **NEW**: Update Single PR API
 router.put(
   "/update-single-pr/:single_pr_id",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   checkFileUpload,
   prController.updateSinglePR
 );
 
 router.get(
   "/get-single-pr/:pr_id",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   prController.getSinglePRs
 );
 router.get(
   "/get-single-pr/:pr_id",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   prController.getSinglePRs
 );
 router.get(
   "/get-single-pr/user/list",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   prController.getUserSinglePRs
 );
 router.get(
   "/get-single-pr/user/statuses",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   prController.getUserPRStatusCounts
 );
 
 router.get(
   "/single-pr-detail/:single_pr_id",
-  authMiddleware,
   apiKeyMiddleware,
+  authMiddleware,
   prController.getSinglePRDetails
 );
 router.get(
   "/superadmin/single-pr-list",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prController.getAllSinglePRs
 );
 
 router.get(
   "/superadmin/single-pr-list/user/:user_id",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prController.getSinglePRsByUser
 );
 router.get(
   "/superadmin/single-pr-list/pr-data/:pr_id",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prController.getSinglePRsByPRData
 );
 router.get(
   "/superadmin/single-pr-details/:single_pr_id",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prController.getSinglePRDetails
 );
 
 router.put(
   "/superadmin/update-single-pr/:single_pr_id",
-  SuperAdminAuthMiddleware,
   apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
   prController.updatePRStatusBySuperAdmin
 );
 
