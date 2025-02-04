@@ -126,7 +126,9 @@ exports.createOrder = async (req, res) => {
     const token = authResponse.headers.get("Token");
     if (!token) {
       await dbConnection.rollback();
-      return res.status(401).json({ message: "Unauthorized: Token not received." });
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: Token not received." });
     }
 
     const issueDate = new Date();
@@ -188,10 +190,11 @@ exports.createOrder = async (req, res) => {
     if (dbConnection) dbConnection.release(); // Ensure the connection is released
 
     console.error("Error:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 
 exports.getOrderStatus = async (req, res) => {
   try {

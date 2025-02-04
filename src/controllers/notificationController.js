@@ -49,7 +49,6 @@ exports.sendNotification = async (req, res) => {
   }
 };
 
-
 // ✅ Fetch All Notifications for a Specific User
 exports.getUserNotifications = async (req, res) => {
   const { id } = req.user;

@@ -64,7 +64,6 @@ exports.createCompany = async (req, res) => {
   }
 };
 
-
 // ✅ **Update an existing company (Admin Only, but only the owner can update)**
 exports.updateCompany = async (req, res) => {
   let dbConnection;
@@ -90,7 +89,9 @@ exports.updateCompany = async (req, res) => {
     }
 
     if (company[0].user_id !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized to update this company" });
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to update this company" });
     }
 
     // Prepare dynamic query for updating only provided fields
@@ -117,12 +118,13 @@ exports.updateCompany = async (req, res) => {
     res.status(200).json({ message: "Company updated successfully" });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback(); // Rollback if any error occurs
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     if (dbConnection) dbConnection.release(); // Release the connection back to the pool
   }
 };
-
 
 // ✅ **Get all companies for the authenticated user**
 exports.getUserCompanies = async (req, res) => {
@@ -138,12 +140,13 @@ exports.getUserCompanies = async (req, res) => {
 
     res.status(200).json(companies);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     if (dbConnection) dbConnection.release(); // Release the connection back to the pool
   }
 };
-
 
 // ✅ **Get company details by ID**
 exports.getCompanyById = async (req, res) => {

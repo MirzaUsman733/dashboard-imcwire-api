@@ -140,7 +140,6 @@ exports.update = async (req, res) => {
   }
 };
 
-
 exports.delete = async (req, res) => {
   let dbConnection;
 

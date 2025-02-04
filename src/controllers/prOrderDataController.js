@@ -221,7 +221,10 @@ exports.submitPR = async (req, res) => {
       return res.status(500).json({ message: "Payment Method is Incorrect" });
     }
     await dbConnection.commit();
-    res.status(201).json({ message: "We are redirecting you to the payment page.", paymentUrl });
+    res.status(201).json({
+      message: "We are redirecting you to the payment page.",
+      paymentUrl,
+    });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     res
@@ -436,51 +439,61 @@ exports.getUserPRsById = async (req, res) => {
 exports.submitCustomOrder = async (req, res) => {
   const {
     orderId,
-    client_id,
     plan_id,
+    perma,
     orderType,
     targetCountries,
     industryCategories,
     total_price,
     payment_status,
     payment_method,
+    // Default to inactive if not provided
+    is_active = 0,
   } = req.body;
 
+  // Corrected: Check for missing fields using !perma (not !!perma)
   if (
-    !client_id ||
     !plan_id ||
     !orderType ||
     !payment_method ||
     !targetCountries.length ||
     !industryCategories.length ||
     !total_price ||
-    !payment_status
+    !payment_status ||
+    !perma
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  // Generate a client_id (assuming uuidv4 is imported)
+  const client_id = uuidv4();
   let dbConnection;
 
   try {
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction(); // Begin Transaction
 
-    // ✅ 1. Store Order Details Without Linking to a User
+    // 1. Store Order Details, including is_active and perma.
+    // Note: We now include a placeholder for is_active.
     const [orderResult] = await dbConnection.query(
-      "INSERT INTO custom_orders (orderId, client_id, plan_id, orderType, total_price, payment_status, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
+      `INSERT INTO custom_orders 
+      (orderId, client_id, plan_id, perma, orderType, total_price, payment_status, payment_method, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         orderId,
         client_id,
         plan_id,
+        perma,
         orderType,
         total_price,
         payment_status,
         payment_method,
+        is_active ? 1 : 0, // Ensure it's either 1 (active) or 0 (inactive)
       ]
     );
     const customOrderId = orderResult.insertId;
 
-    // ✅ 2. Insert Target Countries with Translations
+    // 2. Insert Target Countries with Translations
     let targetCountryIds = [];
     for (const country of targetCountries) {
       let translationId = null;
@@ -499,7 +512,7 @@ exports.submitCustomOrder = async (req, res) => {
       targetCountryIds.push(targetCountryResult.insertId);
     }
 
-    // ✅ 3. Insert Industry Categories for the Order
+    // 3. Insert Industry Categories for the Order
     let industryCategoryIds = [];
     for (const category of industryCategories) {
       const [industryCategoryResult] = await dbConnection.query(
@@ -509,7 +522,7 @@ exports.submitCustomOrder = async (req, res) => {
       industryCategoryIds.push(industryCategoryResult.insertId);
     }
 
-    // ✅ 4. Link Order to Target Countries
+    // 4. Link Order to Target Countries
     for (const countryId of targetCountryIds) {
       await dbConnection.query(
         "INSERT INTO custom_order_target_countries (order_id, target_country_id) VALUES (?, ?)",
@@ -517,7 +530,7 @@ exports.submitCustomOrder = async (req, res) => {
       );
     }
 
-    // ✅ 5. Link Order to Industry Categories
+    // 5. Link Order to Industry Categories
     for (const categoryId of industryCategoryIds) {
       await dbConnection.query(
         "INSERT INTO custom_order_industry_categories (order_id, industry_category_id) VALUES (?, ?)",
@@ -525,8 +538,8 @@ exports.submitCustomOrder = async (req, res) => {
       );
     }
 
-    // ✅ 6. Generate Invoice URL (User Will Provide Details Later)
-    const invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${customOrderId}`;
+    // 6. Generate Invoice URL using the provided perma
+    const invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${perma}`;
 
     await dbConnection.commit();
     res

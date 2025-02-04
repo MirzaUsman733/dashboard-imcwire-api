@@ -200,87 +200,87 @@ exports.createFullReport = async (req, res) => {
       subject: "Your Report Has Been Successfully Uploaded - IMCWire",
       html: `
        <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Report Upload Confirmation</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            width: 80%;
-            max-width: 600px;
-            margin: 20px auto;
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            background: #004085;
-            color: #ffffff;
-            text-align: center;
-            padding: 10px;
-            font-size: 20px;
-            border-radius: 8px 8px 0 0;
-        }
-        .content {
-            padding: 20px;
-            line-height: 1.6;
-            color: #333333;
-        }
-        .footer {
-            text-align: center;
-            padding: 10px;
-            font-size: 12px;
-            color: #777777;
-        }
-        .button {
-            display: inline-block;
-            background: #004085;
-            color: #ffffff;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
-    </style>
-</head>
-<body>
+          <html>
+            <head>
+            <meta charset="UTF-8">
+            <title>Report Upload Confirmation</title>
+          <style>
+            body {
+                font-family: Arial, sans-serif;
+                background-color: #f4f4f4;
+                margin: 0;
+                padding: 0;
+            }
+            .container {
+                width: 80%;
+                max-width: 600px;
+                margin: 20px auto;
+                background: #ffffff;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+                background: #004085;
+                color: #ffffff;
+                text-align: center;
+                padding: 10px;
+                font-size: 20px;
+                border-radius: 8px 8px 0 0;
+            }
+            .content {
+                padding: 20px;
+                line-height: 1.6;
+                color: #333333;
+            }
+            .footer {
+                text-align: center;
+                padding: 10px;
+                font-size: 12px;
+                color: #777777;
+            }
+            .button {
+                display: inline-block;
+                background: #004085;
+                color: #ffffff;
+                padding: 10px 20px;
+                text-decoration: none;
+                border-radius: 5px;
+                margin-top: 10px;
+            }
+            </style>
+        </head>
+        <body>
 
-<div class="container">
-    <div class="header">
-        Report Successfully Uploaded
-    </div>
-    <div class="content">
-        <p>Dear <strong>${username}</strong>,</p>
-        <p>Your report titled <strong>${title}</strong> has been successfully uploaded and published under PR Number.</p>
-        <p>You can check the details of your report in your dashboard.</p>
-        <p>Additionally, you can download the published report in the following formats:</p>
-        <p>
-             <a href="${pdfFtpPath.replace(
-               "/public_html/files",
-               ""
-             )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
-             <a href="${excelFtpPath.replace(
-               "/public_html/files",
-               ""
-             )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
-        </p>
-        <p>If you have any questions, feel free to contact our support team.</p>
-        <p>Best Regards,</p>
-        <p><strong>IMCWire Team</strong></p>
-    </div>
-    <div class="footer">
-        &copy; 2025 IMCWire. All rights reserved.
-    </div>
-</div>
-</body>
-</html>
+            <div class="container">
+                <div class="header">
+                    Report Successfully Uploaded
+                </div>
+                <div class="content">
+                    <p>Dear <strong>${username}</strong>,</p>
+                    <p>Your report titled <strong>${title}</strong> has been successfully uploaded and published under PR Number.</p>
+                    <p>You can check the details of your report in your dashboard.</p>
+                    <p>Additionally, you can download the published report in the following formats:</p>
+                    <p>
+                        <a href="${pdfFtpPath.replace(
+                          "/public_html/files",
+                          ""
+                        )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+                        <a href="${excelFtpPath.replace(
+                          "/public_html/files",
+                          ""
+                        )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+                    </p>
+                    <p>If you have any questions, feel free to contact our support team.</p>
+                    <p>Best Regards,</p>
+                    <p><strong>IMCWire Team</strong></p>
+                </div>
+                <div class="footer">
+                    &copy; 2025 IMCWire. All rights reserved.
+                </div>
+            </div>
+            </body>
+            </html>
 
       `,
     };
@@ -455,7 +455,7 @@ exports.uploadMiddleware = upload.fields([
 exports.getUserReport = async (req, res) => {
   let dbConnection;
   try {
-    const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
+    const user_id = req.user?.id;
     const { report_id } = req.params;
     dbConnection = await connection.getConnection();
 
@@ -489,7 +489,6 @@ exports.getUserReport = async (req, res) => {
       title: reportData[0].title,
       pdf_files: pdfFiles,
       excel_files: excelFiles,
-      // Add other report details as needed
     };
 
     res.status(200).json(report);
@@ -504,7 +503,7 @@ exports.getUserReport = async (req, res) => {
 exports.getAllUserReports = async (req, res) => {
   let dbConnection;
   try {
-    const user_id = req.user?.id; // Extract user_id from authMiddleware or wherever it's available
+    const user_id = req.user?.id;
     dbConnection = await connection.getConnection();
 
     // ✅ Fetch All Reports for the User
