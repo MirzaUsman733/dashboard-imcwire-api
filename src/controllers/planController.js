@@ -5,6 +5,7 @@ exports.createPlan = async (req, res) => {
   try {
     const {
       planName,
+      perma,
       totalPlanPrice,
       priceSingle,
       planDescription,
@@ -14,14 +15,15 @@ exports.createPlan = async (req, res) => {
       type = "package",
     } = req.body;
 
-    if (!planName || !totalPlanPrice || !priceSingle || !numberOfPR) {
+    if (!planName || !totalPlanPrice || !priceSingle || !numberOfPR || !perma) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const [result] = await connection.query(
-      "INSERT INTO plan_items (planName, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR,  activate_plan, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO plan_items (planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         planName,
+        perma,
         totalPlanPrice,
         priceSingle,
         planDescription,

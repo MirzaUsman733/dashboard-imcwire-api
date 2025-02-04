@@ -685,7 +685,7 @@ exports.getAllSinglePRs = async (req, res) => {
 
     // Execute query
     const [singlePRs] = await dbConnection.query(
-      `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id_tags_id, sp.status, 
+      `SELECT sp.id, sp.pr_id, sp.user_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, 
               c.companyName AS company_name 
        FROM single_pr_details sp
        LEFT JOIN companies c ON sp.company_id = c.id`
@@ -717,7 +717,7 @@ exports.getSinglePRsByUser = async (req, res) => {
     dbConnection = await connection.getConnection();
 
     const [singlePRs] = await dbConnection.query(
-      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id_tags_id, sp.status, c.companyName AS company_name 
+      `SELECT sp.id, sp.pr_id, sp.company_id, sp.pr_type, sp.pdf_id, sp.url_tags_id, sp.status, c.companyName AS company_name 
        FROM single_pr_details sp
        JOIN companies c ON sp.company_id = c.id
        WHERE sp.user_id = ?`,
