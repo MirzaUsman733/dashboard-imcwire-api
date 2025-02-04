@@ -221,7 +221,7 @@ exports.submitPR = async (req, res) => {
       return res.status(500).json({ message: "Payment Method is Incorrect" });
     }
     await dbConnection.commit();
-    res.status(201).json({ message: "PR submitted successfully", paymentUrl });
+    res.status(201).json({ message: "We are redirecting you to the payment page.", paymentUrl });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     res
