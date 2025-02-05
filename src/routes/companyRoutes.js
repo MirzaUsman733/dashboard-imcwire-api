@@ -28,6 +28,13 @@ router.get(
 );
 
 router.get(
+  "/company-list",
+  authMiddleware,
+  apiKeyMiddleware,
+  companyController.getUserCompanyNames
+);
+
+router.get(
   "/details",
   authMiddleware,
   apiKeyMiddleware,
