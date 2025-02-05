@@ -2,9 +2,10 @@ const connection = require("../config/dbconfig");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const { default: transporter } = require("../config/transporter");
+const { transporter } = require("../config/transporter");
 require("dotenv").config();
 
+// Register a new user with role
 // Register a new user with role
 exports.registerUser = async (req, res) => {
   const { username, email, password, role, isAgency } = req.body;
@@ -98,6 +99,8 @@ exports.registerUser = async (req, res) => {
     if (dbConnection) dbConnection.release(); // Release connection
   }
 };
+
+
 
 // Login user
 exports.loginUser = async (req, res) => {

@@ -152,12 +152,14 @@ router.get(
   SuperAdminAuthMiddleware,
   prController.getSinglePRsByUser
 );
+
 router.get(
   "/superadmin/single-pr-list/pr-data/:pr_id",
   apiKeyMiddleware,
   SuperAdminAuthMiddleware,
   prController.getSinglePRsByPRData
 );
+
 router.get(
   "/superadmin/single-pr-details/:single_pr_id",
   apiKeyMiddleware,
