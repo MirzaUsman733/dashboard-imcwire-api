@@ -185,15 +185,15 @@ exports.deletePlan = async (req, res) => {
 // Get a single plan by ID (Admin and User)
 exports.getPlanById = async (req, res) => {
   try {
-    const { id } = req.params; // Extract the plan ID from route parameters
+    const { perma } = req.params; // Extract the plan ID from route parameters
 
-    if (!id) {
-      return res.status(400).json({ message: "Plan ID is required" });
+    if (!perma) {
+      return res.status(400).json({ message: "Plan Perma is required" });
     }
 
     const [plans] = await connection.query(
-      "SELECT * FROM plan_items WHERE id = ?",
-      [id]
+      "SELECT * FROM plan_items WHERE perma = ?",
+      [perma]
     );
 
     if (plans.length === 0) {

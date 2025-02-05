@@ -1,6 +1,7 @@
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 const connection = require("../config/dbconfig");
 const { transporter } = require("../config/transporter");
+require('dotenv').config();  // This loads variables from a .env file
 
 // ✅ **One API to Create and Retrieve Stripe Payment Session**
 // exports.handleStripePayment = async (req, res) => {

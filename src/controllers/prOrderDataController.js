@@ -1,6 +1,7 @@
+require('dotenv').config();  // This loads variables from a .env file
 const connection = require("../config/dbconfig");
-const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 const { v4: uuidv4 } = require("uuid");
+const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
 exports.submitPR = async (req, res) => {
   const {
@@ -12,6 +13,7 @@ exports.submitPR = async (req, res) => {
     industryCategories,
     total_price,
     payment_status,
+    ip_address
   } = req.body;
 
   // Generate a random client_id
@@ -25,7 +27,8 @@ exports.submitPR = async (req, res) => {
     !industryCategories.length ||
     !total_price ||
     !pr_status ||
-    !payment_status
+    !payment_status ||
+    !ip_address
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
@@ -103,7 +106,7 @@ exports.submitPR = async (req, res) => {
     }
     // ✅ 7. Insert PR Data
     const [prResult] = await dbConnection.query(
-      "INSERT INTO pr_data (client_id, user_id, plan_id, prType, pr_status, payment_method, total_price, payment_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO pr_data (client_id, user_id, plan_id, prType, pr_status, payment_method, total_price, payment_status, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         client_id,
         req.user.id,
@@ -113,6 +116,7 @@ exports.submitPR = async (req, res) => {
         payment_method,
         total_price,
         payment_status,
+        ip_address
       ]
     );
     const prId = prResult.insertId;
@@ -438,7 +442,6 @@ exports.getUserPRsById = async (req, res) => {
 
 exports.submitCustomOrder = async (req, res) => {
   const {
-    orderId,
     plan_id,
     perma,
     orderType,
@@ -451,7 +454,7 @@ exports.submitCustomOrder = async (req, res) => {
     is_active = 0,
   } = req.body;
 
-  // Corrected: Check for missing fields using !perma (not !!perma)
+  // Check for missing fields
   if (
     !plan_id ||
     !orderType ||
@@ -465,16 +468,27 @@ exports.submitCustomOrder = async (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // Generate a client_id (assuming uuidv4 is imported)
-  const client_id = uuidv4();
   let dbConnection;
-
   try {
     dbConnection = await connection.getConnection();
+
+    // 0. Verify the plan exists
+    const [planRows] = await dbConnection.query(
+      "SELECT id FROM plan_items WHERE id = ?",
+      [plan_id]
+    );
+    if (!planRows.length) {
+      // Plan not found: return a 404 error response
+      return res.status(404).json({ message: "Plan not found" });
+    }
+
+    // Generate unique orderId and client_id
+    const orderId = uuidv4();
+    const client_id = uuidv4();
+
     await dbConnection.beginTransaction(); // Begin Transaction
 
     // 1. Store Order Details, including is_active and perma.
-    // Note: We now include a placeholder for is_active.
     const [orderResult] = await dbConnection.query(
       `INSERT INTO custom_orders 
       (orderId, client_id, plan_id, perma, orderType, total_price, payment_status, payment_method, is_active, created_at)
@@ -555,30 +569,99 @@ exports.submitCustomOrder = async (req, res) => {
   }
 };
 
+// exports.getCustomOrder = async (req, res) => {
+//   const { orderId } = req.params;
+//   if (!orderId) {
+//     return res.status(400).json({ message: "Order ID is required" });
+//   }
+
+//   let dbConnection;
+
+//   try {
+//     dbConnection = await connection.getConnection();
+
+//     // ✅ 1. Fetch Custom Order Data
+//     const [orderResult] = await dbConnection.query(
+//       "SELECT * FROM custom_orders WHERE id = ?",
+//       [orderId]
+//     );
+
+//     if (orderResult.length === 0) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+
+//     const customOrder = orderResult[0];
+
+//     // ✅ 2. Fetch Target Countries Linked to Order
+//     const [targetCountries] = await dbConnection.query(
+//       `SELECT tc.id, tc.countryName, tc.countryPrice
+//        FROM custom_order_target_countries cotc
+//        JOIN target_countries tc ON cotc.target_country_id = tc.id
+//        WHERE cotc.order_id = ?`,
+//       [customOrder.id]
+//     );
+
+//     // ✅ 3. Fetch Industry Categories Linked to Order
+//     const [industryCategories] = await dbConnection.query(
+//       `SELECT ic.id, ic.categoryName, ic.categoryPrice
+//        FROM custom_order_industry_categories coic
+//        JOIN industry_categories ic ON coic.industry_category_id = ic.id
+//        WHERE coic.order_id = ?`,
+//       [customOrder.id]
+//     );
+
+//     // ✅ 4. Build Response
+//     const response = {
+//       orderId: customOrder.orderId,
+//       client_id: customOrder.client_id,
+//       plan_id: customOrder.plan_id,
+//       orderType: customOrder.orderType,
+//       total_price: customOrder.total_price,
+//       payment_status: customOrder.payment_status,
+//       payment_method: customOrder.payment_method,
+//       created_at: customOrder.created_at,
+//       targetCountries,
+//       industryCategories,
+//       invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.id}`,
+//     };
+
+//     res.status(200).json(response);
+//   } catch (error) {
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   } finally {
+//     if (dbConnection) dbConnection.release();
+//   }
+// };
+
+/**
+ * Get a custom order by its perma value.
+ *
+ * This endpoint allows you to retrieve an order using the perma field,
+ * which is used to generate the invoice URL.
+ */
 exports.getCustomOrder = async (req, res) => {
-  const { orderId } = req.params;
-  if (!orderId) {
-    return res.status(400).json({ message: "Order ID is required" });
+  const { perma } = req.params;
+  if (!perma) {
+    return res.status(400).json({ message: "Perma is required" });
   }
 
   let dbConnection;
-
   try {
     dbConnection = await connection.getConnection();
 
-    // ✅ 1. Fetch Custom Order Data
+    // 1. Fetch Custom Order Data by perma
     const [orderResult] = await dbConnection.query(
-      "SELECT * FROM custom_orders WHERE id = ?",
-      [orderId]
+      "SELECT * FROM custom_orders WHERE perma = ?",
+      [perma]
     );
-
     if (orderResult.length === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
-
     const customOrder = orderResult[0];
 
-    // ✅ 2. Fetch Target Countries Linked to Order
+    // 2. Fetch Target Countries Linked to the Order
     const [targetCountries] = await dbConnection.query(
       `SELECT tc.id, tc.countryName, tc.countryPrice
        FROM custom_order_target_countries cotc
@@ -587,7 +670,7 @@ exports.getCustomOrder = async (req, res) => {
       [customOrder.id]
     );
 
-    // ✅ 3. Fetch Industry Categories Linked to Order
+    // 3. Fetch Industry Categories Linked to the Order
     const [industryCategories] = await dbConnection.query(
       `SELECT ic.id, ic.categoryName, ic.categoryPrice
        FROM custom_order_industry_categories coic
@@ -596,7 +679,7 @@ exports.getCustomOrder = async (req, res) => {
       [customOrder.id]
     );
 
-    // ✅ 4. Build Response
+    // 4. Build the Response, using the perma field for the invoice URL.
     const response = {
       orderId: customOrder.orderId,
       client_id: customOrder.client_id,
@@ -608,10 +691,58 @@ exports.getCustomOrder = async (req, res) => {
       created_at: customOrder.created_at,
       targetCountries,
       industryCategories,
-      invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.id}`,
+      invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.perma}`,
     };
 
     res.status(200).json(response);
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
+
+/**
+ * Retrieve all custom orders along with their target countries and industry categories.
+ */
+exports.getAllCustomOrders = async (req, res) => {
+  let dbConnection;
+  try {
+    dbConnection = await connection.getConnection();
+
+    // Retrieve all orders sorted by creation date descending.
+    const [orders] = await dbConnection.query(
+      "SELECT * FROM custom_orders ORDER BY created_at DESC"
+    );
+
+    // For each order, fetch the linked target countries and industry categories.
+    for (let order of orders) {
+      // 1. Retrieve target countries for this order (with translation info if available)
+      const [targetCountries] = await dbConnection.query(
+        `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation AS translationValue 
+         FROM target_countries tc
+         LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
+         JOIN custom_order_target_countries ctc ON tc.id = ctc.target_country_id
+         WHERE ctc.order_id = ?`,
+        [order.id]
+      );
+      order.targetCountries = targetCountries;
+
+      // 2. Retrieve industry categories for this order
+      const [industryCategories] = await dbConnection.query(
+        `SELECT ic.id, ic.categoryName, ic.categoryPrice 
+         FROM industry_categories ic
+         JOIN custom_order_industry_categories ctc ON ic.id = ctc.industry_category_id
+         WHERE ctc.order_id = ?`,
+        [order.id]
+      );
+      order.industryCategories = industryCategories;
+
+      // 3. Generate the invoice URL using the perma field.
+      order.invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${order.perma}`;
+    }
+
+    res.status(200).json({ customOrders: orders });
   } catch (error) {
     res
       .status(500)
@@ -620,7 +751,6 @@ exports.getCustomOrder = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
-
 exports.deleteCustomOrder = async (req, res) => {
   const { orderId } = req.params;
 

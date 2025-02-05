@@ -1,3 +1,4 @@
+require('dotenv').config();
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 const connection = require("../config/dbconfig");
 const { transporter } = require("../config/transporter");

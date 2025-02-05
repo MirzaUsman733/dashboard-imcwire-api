@@ -4,8 +4,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "stripe:listen": "stripe listen --forward-to localhost:3008/v1/webhook"
+    "dev": "nodemon src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -35,7 +34,7 @@
     "path": "^0.12.7",
     "rate-limit-redis": "^4.2.0",
     "streamifier": "^0.1.1",
-    "stripe": "^17.5.0",
+    "stripe": "^17.6.0",
     "uuid": "^11.0.5",
     "xlsx": "^0.18.5"
   }

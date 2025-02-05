@@ -36,9 +36,15 @@ router.post(
 
 // ✅ One API to insert all data at once
 router.get(
-  "/custom-order/:orderId",
+  "/custom-order/:perma",
   apiKeyMiddleware,
   prOrderDataController.getCustomOrder
+);
+
+router.get(
+  "/all-custom-order",
+  apiKeyMiddleware,
+  prOrderDataController.getAllCustomOrders
 );
 
 // ✅ One API to insert all data at once

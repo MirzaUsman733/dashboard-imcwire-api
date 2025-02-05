@@ -33,5 +33,5 @@ router.get("/list", apiKeyMiddleware, planController.getPlans);
 router.get("/active-plans", apiKeyMiddleware, planController.getActivePlans);
 
 // New route for getting a single plan by ID
-router.get("/single/:id", apiKeyMiddleware, planController.getPlanById);
+router.get("/single/:perma", apiKeyMiddleware, planController.getPlanById);
 module.exports = router;
