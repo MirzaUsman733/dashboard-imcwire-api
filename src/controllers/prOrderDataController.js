@@ -1,4 +1,4 @@
-require('dotenv').config();  // This loads variables from a .env file
+require("dotenv").config(); // This loads variables from a .env file
 const connection = require("../config/dbconfig");
 const { v4: uuidv4 } = require("uuid");
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
@@ -13,7 +13,7 @@ exports.submitPR = async (req, res) => {
     industryCategories,
     total_price,
     payment_status,
-    ip_address
+    ip_address,
   } = req.body;
 
   // Generate a random client_id
@@ -116,7 +116,7 @@ exports.submitPR = async (req, res) => {
         payment_method,
         total_price,
         payment_status,
-        ip_address
+        ip_address,
       ]
     );
     const prId = prResult.insertId;
@@ -442,28 +442,37 @@ exports.getUserPRsById = async (req, res) => {
 
 exports.submitCustomOrder = async (req, res) => {
   const {
-    plan_id,
+    planName,
     perma,
+    totalPlanPrice,
+    priceSingle,
+    planDescription,
+    pdfLink,
+    numberOfPR,
+    activate_plan = 0, // Default to inactive
+    type,
     orderType,
     targetCountries,
     industryCategories,
     total_price,
     payment_status,
     payment_method,
-    // Default to inactive if not provided
-    is_active = 0,
+    is_active = 0, // Default to inactive
   } = req.body;
 
-  // Check for missing fields
+  // Validate Required Fields
   if (
-    !plan_id ||
+    !planName ||
+    !perma ||
+    !totalPlanPrice ||
+    !priceSingle ||
+    !planDescription ||
     !orderType ||
     !payment_method ||
     !targetCountries.length ||
     !industryCategories.length ||
     !total_price ||
-    !payment_status ||
-    !perma
+    !payment_status
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
@@ -471,24 +480,44 @@ exports.submitCustomOrder = async (req, res) => {
   let dbConnection;
   try {
     dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction(); // Begin Transaction
 
-    // 0. Verify the plan exists
-    const [planRows] = await dbConnection.query(
-      "SELECT id FROM plan_items WHERE id = ?",
-      [plan_id]
+    // 1. Insert Plan into `plan_items` if it doesn't exist
+    let plan_id;
+    const [existingPlan] = await dbConnection.query(
+      "SELECT id FROM plan_items WHERE perma = ?",
+      [perma]
     );
-    if (!planRows.length) {
-      // Plan not found: return a 404 error response
-      return res.status(404).json({ message: "Plan not found" });
+
+    if (existingPlan.length > 0) {
+      // Plan already exists, use the existing ID
+      plan_id = existingPlan[0].id;
+    } else {
+      // Insert new plan
+      const [planResult] = await dbConnection.query(
+        `INSERT INTO plan_items 
+        (planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          planName,
+          perma,
+          totalPlanPrice,
+          priceSingle,
+          planDescription,
+          pdfLink,
+          numberOfPR,
+          activate_plan,
+          type,
+        ]
+      );
+      plan_id = planResult.insertId; // Get newly inserted plan ID
     }
 
-    // Generate unique orderId and client_id
+    // 2. Generate unique orderId and client_id
     const orderId = uuidv4();
     const client_id = uuidv4();
 
-    await dbConnection.beginTransaction(); // Begin Transaction
-
-    // 1. Store Order Details, including is_active and perma.
+    // 3. Store Custom Order
     const [orderResult] = await dbConnection.query(
       `INSERT INTO custom_orders 
       (orderId, client_id, plan_id, perma, orderType, total_price, payment_status, payment_method, is_active, created_at)
@@ -502,20 +531,25 @@ exports.submitCustomOrder = async (req, res) => {
         total_price,
         payment_status,
         payment_method,
-        is_active ? 1 : 0, // Ensure it's either 1 (active) or 0 (inactive)
+        is_active ? 1 : 0,
       ]
     );
     const customOrderId = orderResult.insertId;
 
-    // 2. Insert Target Countries with Translations
+    // 4. Insert Target Countries with Translations
     let targetCountryIds = [];
     for (const country of targetCountries) {
       let translationId = null;
       if (country.translationRequired) {
+        // const [translationResult] = await dbConnection.query(
+        //   "INSERT INTO translation_required (translation) VALUES (?)",
+        //   [country.translationRequired]
+        // );
         const [translationResult] = await dbConnection.query(
-          "INSERT INTO translation_required (translation) VALUES (?)",
-          [country.translationRequired]
+          "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
+          [country.translationRequired, country.translationPrice]
         );
+
         translationId = translationResult.insertId;
       }
 
@@ -526,7 +560,7 @@ exports.submitCustomOrder = async (req, res) => {
       targetCountryIds.push(targetCountryResult.insertId);
     }
 
-    // 3. Insert Industry Categories for the Order
+    // 5. Insert Industry Categories for the Order
     let industryCategoryIds = [];
     for (const category of industryCategories) {
       const [industryCategoryResult] = await dbConnection.query(
@@ -536,7 +570,7 @@ exports.submitCustomOrder = async (req, res) => {
       industryCategoryIds.push(industryCategoryResult.insertId);
     }
 
-    // 4. Link Order to Target Countries
+    // 6. Link Order to Target Countries
     for (const countryId of targetCountryIds) {
       await dbConnection.query(
         "INSERT INTO custom_order_target_countries (order_id, target_country_id) VALUES (?, ?)",
@@ -544,7 +578,7 @@ exports.submitCustomOrder = async (req, res) => {
       );
     }
 
-    // 5. Link Order to Industry Categories
+    // 7. Link Order to Industry Categories
     for (const categoryId of industryCategoryIds) {
       await dbConnection.query(
         "INSERT INTO custom_order_industry_categories (order_id, industry_category_id) VALUES (?, ?)",
@@ -552,13 +586,16 @@ exports.submitCustomOrder = async (req, res) => {
       );
     }
 
-    // 6. Generate Invoice URL using the provided perma
+    // 8. Generate Invoice URL using the provided perma
     const invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${perma}`;
 
     await dbConnection.commit();
-    res
-      .status(201)
-      .json({ message: "Custom order submitted successfully", invoiceUrl });
+    res.status(201).json({
+      message: "Custom order and plan submitted successfully",
+      invoiceUrl,
+      plan_id,
+      orderId,
+    });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     res
@@ -641,6 +678,67 @@ exports.submitCustomOrder = async (req, res) => {
  * This endpoint allows you to retrieve an order using the perma field,
  * which is used to generate the invoice URL.
  */
+// exports.getCustomOrder = async (req, res) => {
+//   const { perma } = req.params;
+//   if (!perma) {
+//     return res.status(400).json({ message: "Perma is required" });
+//   }
+
+//   let dbConnection;
+//   try {
+//     dbConnection = await connection.getConnection();
+
+//     // 1. Fetch Custom Order Data by perma
+//     const [orderResult] = await dbConnection.query(
+//       "SELECT * FROM custom_orders WHERE perma = ?",
+//       [perma]
+//     );
+//     if (orderResult.length === 0) {
+//       return res.status(404).json({ message: "Order not found" });
+//     }
+//     const customOrder = orderResult[0];
+
+//     // 2. Fetch Target Countries Linked to the Order
+//     const [targetCountries] = await dbConnection.query(
+//       `SELECT tc.id, tc.countryName, tc.countryPrice
+//        FROM custom_order_target_countries cotc
+//        JOIN target_countries tc ON cotc.target_country_id = tc.id
+//        WHERE cotc.order_id = ?`,
+//       [customOrder.id]
+//     );
+
+//     // 3. Fetch Industry Categories Linked to the Order
+//     const [industryCategories] = await dbConnection.query(
+//       `SELECT ic.id, ic.categoryName, ic.categoryPrice
+//        FROM custom_order_industry_categories coic
+//        JOIN industry_categories ic ON coic.industry_category_id = ic.id
+//        WHERE coic.order_id = ?`,
+//       [customOrder.id]
+//     );
+
+//     // 4. Build the Response, using the perma field for the invoice URL.
+//     const response = {
+//       orderId: customOrder.orderId,
+//       client_id: customOrder.client_id,
+//       plan_id: customOrder.plan_id,
+//       orderType: customOrder.orderType,
+//       total_price: customOrder.total_price,
+//       payment_status: customOrder.payment_status,
+//       payment_method: customOrder.payment_method,
+//       created_at: customOrder.created_at,
+//       targetCountries,
+//       industryCategories,
+//       invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.perma}`,
+//     };
+
+//     res.status(200).json(response);
+//   } catch (error) {
+//     res.status(500).json({ message: "Internal Server Error", error: error.message });
+//   } finally {
+//     if (dbConnection) dbConnection.release();
+//   }
+// };
+
 exports.getCustomOrder = async (req, res) => {
   const { perma } = req.params;
   if (!perma) {
@@ -663,9 +761,10 @@ exports.getCustomOrder = async (req, res) => {
 
     // 2. Fetch Target Countries Linked to the Order
     const [targetCountries] = await dbConnection.query(
-      `SELECT tc.id, tc.countryName, tc.countryPrice
+      `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation AS translationValue
        FROM custom_order_target_countries cotc
        JOIN target_countries tc ON cotc.target_country_id = tc.id
+       LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
        WHERE cotc.order_id = ?`,
       [customOrder.id]
     );
@@ -679,24 +778,48 @@ exports.getCustomOrder = async (req, res) => {
       [customOrder.id]
     );
 
-    // 4. Build the Response, using the perma field for the invoice URL.
+    // 4. Fetch Plan Details (Associated with the Custom Order)
+    const [planResult] = await dbConnection.query(
+      "SELECT * FROM plan_items WHERE id = ?",
+      [customOrder.plan_id]
+    );
+
+    const planData = planResult.length ? planResult[0] : null;
+
+    // 5. Build the Response
     const response = {
-      orderId: customOrder.orderId,
-      client_id: customOrder.client_id,
       plan_id: customOrder.plan_id,
+      perma: customOrder.perma,
       orderType: customOrder.orderType,
       total_price: customOrder.total_price,
       payment_status: customOrder.payment_status,
       payment_method: customOrder.payment_method,
+      is_active: customOrder.is_active,
       created_at: customOrder.created_at,
       targetCountries,
       industryCategories,
+      planData: planData
+        ? {
+            plan_id: planData.id,
+            planName: planData.planName,
+            perma: planData.perma,
+            totalPlanPrice: planData.totalPlanPrice,
+            priceSingle: planData.priceSingle,
+            planDescription: planData.planDescription,
+            pdfLink: planData.pdfLink,
+            numberOfPR: planData.numberOfPR,
+            activate_plan: planData.activate_plan,
+            type: planData.type,
+          }
+        : null,
       invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.perma}`,
     };
 
     res.status(200).json(response);
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     if (dbConnection) dbConnection.release();
   }
@@ -710,39 +833,92 @@ exports.getAllCustomOrders = async (req, res) => {
   try {
     dbConnection = await connection.getConnection();
 
-    // Retrieve all orders sorted by creation date descending.
+    // 1️⃣ Retrieve all orders sorted by `created_at DESC`
     const [orders] = await dbConnection.query(
-      "SELECT * FROM custom_orders ORDER BY created_at DESC"
+      `SELECT co.*, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, 
+              pi.numberOfPR, pi.activate_plan, pi.type 
+       FROM custom_orders co
+       LEFT JOIN plan_items pi ON co.plan_id = pi.id
+       ORDER BY co.created_at DESC` // ✅ Latest orders appear first
     );
 
-    // For each order, fetch the linked target countries and industry categories.
+    // 2️⃣ Fetch all target countries (with translations)
+    const [targetCountries] = await dbConnection.query(
+      `SELECT ctc.order_id, tc.id, tc.countryName, tc.countryPrice, tr.translation AS translationValue 
+       FROM custom_order_target_countries ctc
+       JOIN target_countries tc ON ctc.target_country_id = tc.id
+       LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
+       ORDER BY ctc.order_id DESC` // ✅ Order by latest first
+    );
+
+    // 3️⃣ Fetch all industry categories
+    const [industryCategories] = await dbConnection.query(
+      `SELECT coic.order_id, ic.id, ic.categoryName, ic.categoryPrice 
+       FROM custom_order_industry_categories coic
+       JOIN industry_categories ic ON coic.industry_category_id = ic.id
+       ORDER BY coic.order_id DESC` // ✅ Order by latest first
+    );
+
+    // 4️⃣ Map each order with its associated data
+    const orderMap = {};
+
     for (let order of orders) {
-      // 1. Retrieve target countries for this order (with translation info if available)
-      const [targetCountries] = await dbConnection.query(
-        `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation AS translationValue 
-         FROM target_countries tc
-         LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
-         JOIN custom_order_target_countries ctc ON tc.id = ctc.target_country_id
-         WHERE ctc.order_id = ?`,
-        [order.id]
-      );
-      order.targetCountries = targetCountries;
-
-      // 2. Retrieve industry categories for this order
-      const [industryCategories] = await dbConnection.query(
-        `SELECT ic.id, ic.categoryName, ic.categoryPrice 
-         FROM industry_categories ic
-         JOIN custom_order_industry_categories ctc ON ic.id = ctc.industry_category_id
-         WHERE ctc.order_id = ?`,
-        [order.id]
-      );
-      order.industryCategories = industryCategories;
-
-      // 3. Generate the invoice URL using the perma field.
-      order.invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${order.perma}`;
+      orderMap[order.id] = {
+        orderId: order.orderId,
+        client_id: order.client_id,
+        perma: order.perma,
+        orderType: order.orderType,
+        total_price: order.total_price,
+        payment_status: order.payment_status,
+        payment_method: order.payment_method,
+        is_active: order.is_active,
+        created_at: order.created_at,
+        invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${order.perma}`,
+        plan: order.planName
+          ? {
+              plan_id: order.plan_id,
+              planName: order.planName,
+              totalPlanPrice: order.totalPlanPrice,
+              priceSingle: order.priceSingle,
+              planDescription: order.planDescription,
+              pdfLink: order.pdfLink,
+              numberOfPR: order.numberOfPR,
+              activate_plan: order.activate_plan,
+              type: order.type,
+            }
+          : null,
+        targetCountries: [],
+        industryCategories: [],
+      };
     }
 
-    res.status(200).json({ customOrders: orders });
+    // 5️⃣ Assign target countries to corresponding orders
+    for (let country of targetCountries) {
+      if (orderMap[country.order_id]) {
+        orderMap[country.order_id].targetCountries.push({
+          id: country.id,
+          countryName: country.countryName,
+          countryPrice: country.countryPrice,
+          translationValue: country.translationValue || null,
+        });
+      }
+    }
+
+    // 6️⃣ Assign industry categories to corresponding orders
+    for (let category of industryCategories) {
+      if (orderMap[category.order_id]) {
+        orderMap[category.order_id].industryCategories.push({
+          id: category.id,
+          categoryName: category.categoryName,
+          categoryPrice: category.categoryPrice,
+        });
+      }
+    }
+
+    // 7️⃣ Convert object back to an array for API response
+    const response = Object.values(orderMap);
+
+    res.status(200).json(response);
   } catch (error) {
     res
       .status(500)
@@ -751,6 +927,70 @@ exports.getAllCustomOrders = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
+
+exports.updateOrderOrPlanActivationByPerma = async (req, res) => {
+  const { perma } = req.params; // ✅ Extract perma from the URL
+  const { is_active, activate_plan } = req.body; // ✅ Extract fields from request body
+
+  if (!perma) {
+    return res.status(400).json({ message: "Perma is required in the URL" });
+  }
+
+  let dbConnection;
+  try {
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction(); // ✅ Start transaction
+
+    // 1️⃣ Check if the order exists using perma
+    const [orderResult] = await dbConnection.query(
+      "SELECT orderId, plan_id FROM custom_orders WHERE perma = ?",
+      [perma]
+    );
+
+    if (orderResult.length === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const { orderId, plan_id } = orderResult[0];
+
+    // 2️⃣ Update `is_active` (order activation) if provided
+    if (is_active !== undefined) {
+      await dbConnection.query(
+        "UPDATE custom_orders SET is_active = ? WHERE perma = ?",
+        [is_active ? 1 : 0, perma]
+      );
+    }
+
+    // 3️⃣ Update `activate_plan` (plan activation) if provided & plan exists
+    if (activate_plan !== undefined && plan_id) {
+      await dbConnection.query(
+        "UPDATE plan_items SET activate_plan = ? WHERE id = ?",
+        [activate_plan ? 1 : 0, plan_id]
+      );
+    }
+
+    await dbConnection.commit(); // ✅ Commit transaction
+
+    res.status(200).json({
+      message: "Order/Plan activation updated successfully",
+      updated: {
+        perma,
+        orderId,
+        is_active: is_active !== undefined ? is_active : "Not updated",
+        activate_plan:
+          activate_plan !== undefined ? activate_plan : "Not updated",
+      },
+    });
+  } catch (error) {
+    await dbConnection.rollback();
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
+
 exports.deleteCustomOrder = async (req, res) => {
   const { orderId } = req.params;
 

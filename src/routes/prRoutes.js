@@ -47,6 +47,13 @@ router.get(
   prOrderDataController.getAllCustomOrders
 );
 
+// ✅ Update Order/Plan Activation via `perma` in URL
+router.put(
+  "/update-order-plan/:perma",
+  apiKeyMiddleware,
+  prOrderDataController.updateOrderOrPlanActivationByPerma
+);
+
 // ✅ One API to insert all data at once
 router.delete(
   "/custom-order/:orderId",

@@ -15,10 +15,22 @@ exports.createPlan = async (req, res) => {
       type = "package",
     } = req.body;
 
+    // ✅ Validate Required Fields
     if (!planName || !totalPlanPrice || !priceSingle || !numberOfPR || !perma) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
+    // ✅ Check if Perma Already Exists
+    const [existingPlan] = await connection.query(
+      "SELECT id FROM plan_items WHERE perma = ?",
+      [perma]
+    );
+
+    if (existingPlan.length > 0) {
+      return res.status(409).json({ message: "Perma already exists, choose a unique perma" });
+    }
+
+    // ✅ Insert New Plan (if perma is unique)
     const [result] = await connection.query(
       "INSERT INTO plan_items (planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
@@ -34,87 +46,71 @@ exports.createPlan = async (req, res) => {
       ]
     );
 
-    res
-      .status(201)
-      .json({ message: "Plan added successfully", planId: result.insertId });
+    res.status(201).json({ message: "Plan added successfully", planId: result.insertId });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
 
 // Update an existing plan (Admin Only)
 exports.updatePlan = async (req, res) => {
   try {
-    const {
-      id,
-      planName,
-      totalPlanPrice,
-      priceSingle,
-      planDescription,
-      pdfLink,
-      numberOfPR,
-      activate_plan,
-      type,
-    } = req.body;
+    const { perma } = req.params; // ✅ Extract `perma` from URL
+    const { activate_plan } = req.body; // ✅ Extract only `activate_plan`
 
-    if (!id) {
-      return res.status(400).json({ message: "Plan ID is required" });
+    if (!perma) {
+      return res.status(400).json({ message: "Perma is required in the URL" });
     }
 
-    const queryParts = [];
-    const values = [];
-
-    if (planName !== undefined) {
-      queryParts.push("planName = ?");
-      values.push(planName);
-    }
-    if (totalPlanPrice !== undefined) {
-      queryParts.push("totalPlanPrice = ?");
-      values.push(totalPlanPrice);
-    }
-    if (priceSingle !== undefined) {
-      queryParts.push("priceSingle = ?");
-      values.push(priceSingle);
-    }
-    if (planDescription !== undefined) {
-      queryParts.push("planDescription = ?");
-      values.push(planDescription);
-    }
-    if (pdfLink !== undefined) {
-      queryParts.push("pdfLink = ?");
-      values.push(pdfLink);
-    }
-    if (numberOfPR !== undefined) {
-      queryParts.push("numberOfPR = ?");
-      values.push(numberOfPR);
-    }
-    if (activate_plan !== undefined) {
-      queryParts.push("activate_plan = ?");
-      values.push(activate_plan);
-    }
-    if (type !== undefined) {
-      queryParts.push("type = ?");
-      values.push(type);
+    if (activate_plan === undefined) {
+      return res.status(400).json({ message: "activate_plan field is required in the request body" });
     }
 
-    if (queryParts.length === 0) {
-      return res.status(400).json({ message: "No valid fields to update" });
+    let dbConnection;
+    try {
+      dbConnection = await connection.getConnection();
+      await dbConnection.beginTransaction(); // ✅ Start transaction
+
+      // ✅ Check if the plan exists using perma
+      const [planResult] = await dbConnection.query(
+        "SELECT id FROM plan_items WHERE perma = ?",
+        [perma]
+      );
+
+      if (planResult.length === 0) {
+        return res.status(404).json({ message: "Plan not found" });
+      }
+
+      // ✅ Update only `activate_plan`
+      const [updateResult] = await dbConnection.query(
+        "UPDATE plan_items SET activate_plan = ? WHERE perma = ?",
+        [activate_plan ? 1 : 0, perma]
+      );
+
+      if (updateResult.affectedRows === 0) {
+        return res.status(400).json({ message: "No changes made, plan already in the requested state" });
+      }
+
+      await dbConnection.commit(); // ✅ Commit transaction
+
+      res.status(200).json({
+        message: "Plan activation updated successfully",
+        updated: {
+          perma,
+          activate_plan,
+        },
+      });
+    } catch (error) {
+      await dbConnection.rollback(); // ❌ Rollback transaction on error
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } finally {
+      if (dbConnection) dbConnection.release();
     }
-
-    values.push(id);
-
-    await connection.query(
-      `UPDATE plan_items SET ${queryParts.join(", ")} WHERE id = ?`,
-      values
-    );
-
-    res.status(200).json({ message: "Plan updated successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 // Get all plans (with optional filtering by type)
 exports.getPlans = async (req, res) => {

@@ -13,7 +13,7 @@ router.post(
 );
 
 router.put(
-  "/update",
+  "/update/:perma",
   SuperAdminAuthMiddleware,
   apiKeyMiddleware,
   planController.updatePlan
