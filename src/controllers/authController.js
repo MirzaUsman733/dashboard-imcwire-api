@@ -6,7 +6,6 @@ const { transporter } = require("../config/transporter");
 require("dotenv").config();
 
 // Register a new user with role
-// Register a new user with role
 exports.registerUser = async (req, res) => {
   const { username, email, password, role, isAgency } = req.body;
   let dbConnection;
