@@ -335,13 +335,18 @@ exports.getUserPRs = async (req, res) => {
         `SELECT * FROM plan_records WHERE pr_id = ?`,
         [pr.id]
       );
-
+      // Fetch Single PR Details
+      const [singlePRDetails] = await connection.query(
+        `SELECT * FROM single_pr_details WHERE pr_id = ?`,
+        [pr.id]
+      );
       // Add Related Data to PR Object
       pr.targetCountries = targetCountries.length ? targetCountries : [];
       pr.industryCategories = industryCategories.length
         ? industryCategories
         : [];
       pr.planRecords = planRecords.length ? planRecords : [];
+      pr.singlePRDetails = singlePRDetails.length ? singlePRDetails : [];
     }
 
     res.status(200).json(prData);
@@ -374,7 +379,6 @@ exports.getUserPRsIds = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 
 // ✅ **Retrieve All PRs (SuperAdmin Only)**
 exports.getAllPRs = async (req, res) => {
@@ -412,17 +416,26 @@ exports.getAllPRs = async (req, res) => {
          WHERE pic.pr_id = ?`,
         [pr.id]
       );
- // Fetch Plan Record Data
- const [planRecords] = await connection.query(
-  `SELECT * FROM plan_records WHERE pr_id = ?`,
-  [pr.id]
-);
+
+      // Fetch Plan Record Data
+      const [planRecords] = await connection.query(
+        `SELECT * FROM plan_records WHERE pr_id = ?`,
+        [pr.id]
+      );
+
+      // Fetch Single PR Details
+      const [singlePRDetails] = await connection.query(
+        `SELECT * FROM single_pr_details WHERE pr_id = ?`,
+        [pr.id]
+      );
+
       // Add Related Data to PR Object
       pr.targetCountries = targetCountries.length ? targetCountries : [];
       pr.industryCategories = industryCategories.length
         ? industryCategories
         : [];
-        pr.planRecords = planRecords.length ? planRecords : [];
+      pr.planRecords = planRecords.length ? planRecords : [];
+      pr.singlePRDetails = singlePRDetails.length ? singlePRDetails : [];
     }
 
     res.status(200).json(prData);
