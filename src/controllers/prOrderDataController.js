@@ -330,11 +330,18 @@ exports.getUserPRs = async (req, res) => {
         [pr.id]
       );
 
+      // Fetch Plan Record Data
+      const [planRecords] = await connection.query(
+        `SELECT * FROM plan_records WHERE pr_id = ?`,
+        [pr.id]
+      );
+
       // Add Related Data to PR Object
       pr.targetCountries = targetCountries.length ? targetCountries : [];
       pr.industryCategories = industryCategories.length
         ? industryCategories
         : [];
+      pr.planRecords = planRecords.length ? planRecords : [];
     }
 
     res.status(200).json(prData);
@@ -380,19 +387,27 @@ exports.getAllPRs = async (req, res) => {
          WHERE pic.pr_id = ?`,
         [pr.id]
       );
-
+ // Fetch Plan Record Data
+ const [planRecords] = await connection.query(
+  `SELECT * FROM plan_records WHERE pr_id = ?`,
+  [pr.id]
+);
       // Add Related Data to PR Object
       pr.targetCountries = targetCountries.length ? targetCountries : [];
-      pr.industryCategories = industryCategories.length ? industryCategories : [];
+      pr.industryCategories = industryCategories.length
+        ? industryCategories
+        : [];
+        pr.planRecords = planRecords.length ? planRecords : [];
     }
 
     res.status(200).json(prData);
   } catch (error) {
-    console.error('Error fetching PRs:', error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    console.error("Error fetching PRs:", error);
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 
 // ✅ **Update PR Order Status (SuperAdmin)**
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
