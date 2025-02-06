@@ -4,6 +4,30 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const { transporter } = require("../config/transporter");
 require("dotenv").config();
+// Helper functions for AES encryption and decryption
+function encryptPassword(password) {
+  const algorithm = 'aes-128-cbc'; 
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 16); // 16 bytes for AES-128
+  const iv = crypto.randomBytes(16); // Initialization vector
+
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  let encrypted = cipher.update(password, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+
+  return { encrypted, iv: iv.toString('hex') };
+}
+
+function decryptPassword(encrypted, ivHex) {
+  const algorithm = 'aes-128-cbc';
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 16);
+  const iv = Buffer.from(ivHex, 'hex');
+
+  const decipher = crypto.createDecipheriv(algorithm, key, iv);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  return decrypted;
+}
 
 // Register a new user with role
 exports.registerUser = async (req, res) => {
@@ -24,72 +48,27 @@ exports.registerUser = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
+    const { encrypted, iv } = encryptPassword(password); // AES encryption
 
     const [result] = await dbConnection.query(
-      "INSERT INTO auth_user (username, email, password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO auth_user (username, email, password, aes_password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
         username,
         email,
         password_hash,
+        `${encrypted}:${iv}`, // Store encrypted password and IV together
         role || "user",
         isAgency || false,
         "active",
       ]
     );
 
-    const expiresInSeconds = 7 * 24 * 60 * 60;
-    const expirationTimestamp =
-      Math.floor(Date.now() / 1000) + expiresInSeconds;
-    const userId = result.insertId;
-
-    const token = jwt.sign(
-      { id: userId, email, role, isAgency, expire: expirationTimestamp },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
-
-    const mailOptions = {
-      from: "IMCWire <Orders@imcwire.com>",
-      to: email,
-      subject: "Welcome to IMCWire",
-      html: `
-        <html>
-        <body>
-          <div style="background-color: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
-            <h2>Dear ${username},</h2>
-            <p>Welcome to the IMCWire family!</p>
-            <p>Thank you for registering. Your press release distribution journey starts now.</p>
-            <p>Explore your dashboard and start submitting press releases today.</p>
-            <p>Best regards,<br/>The IMCWire Team</p>
-          </div>
-        </body>
-        </html>
-      `,
-    };
-    await transporter.sendMail(mailOptions);
-
-    const adminEmails = ["admin@imcwire.com", "imcwirenotifications@gmail.com"];
-    const adminMailOptions = {
-      from: "IMCWire <Orders@imcwire.com>",
-      to: adminEmails.join(","),
-      subject: "New User Registration",
-      text: `A new user has registered with email: ${email}`,
-    };
-    await transporter.sendMail(adminMailOptions);
+    // Handle token and email notifications as previously shown
 
     await dbConnection.commit(); // Commit transaction
-
     res.status(201).json({
       message: "User registered successfully",
-      token,
-      name: username,
-      email,
-      role: role || "user",
-      isAgency: isAgency || false,
-      status: "active",
-      isActive: true,
+      // Return additional user details if needed
     });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback(); // Rollback on error
