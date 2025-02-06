@@ -45,7 +45,7 @@ exports.submitSinglePR = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized PR access." });
     if (pr.payment_status !== "paid")
       return res.status(400).json({ message: "PR not paid." });
-    if (pr.payment_status !== "refund")
+    if (pr.payment_status === "refund")
       return res
         .status(400)
         .json({
