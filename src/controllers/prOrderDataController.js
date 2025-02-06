@@ -381,11 +381,77 @@ exports.getUserPRsIds = async (req, res) => {
 };
 
 // ✅ **Retrieve All PRs (SuperAdmin Only)**
+// exports.getAllPRs = async (req, res) => {
+//   try {
+//     // Fetch all PR Data along with user and plan item data
+//     const [prData] = await connection.query(
+//       `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at, pi.perma
+//        FROM pr_data pr
+//        JOIN auth_user au ON pr.user_id = au.auth_user_id
+//        JOIN plan_items pi ON pr.plan_id = pi.id
+//        ORDER BY pr.created_at DESC`
+//     );
+
+//     if (prData.length === 0) {
+//       return res.status(404).json({ message: "No PRs found" });
+//     }
+
+//     // Fetch Related Data for Each PR
+//     for (let pr of prData) {
+//       // Fetch Target Countries & Translations for PR
+//       const [targetCountries] = await connection.query(
+//         `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
+//          FROM pr_target_countries ptc
+//          JOIN target_countries tc ON ptc.target_country_id = tc.id
+//          LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
+//          WHERE ptc.pr_id = ?`,
+//         [pr.id]
+//       );
+
+//       // Fetch Industry Categories for PR
+//       const [industryCategories] = await connection.query(
+//         `SELECT ic.id, ic.categoryName, ic.categoryPrice
+//          FROM pr_industry_categories pic
+//          JOIN industry_categories ic ON pic.target_industry_id = ic.id
+//          WHERE pic.pr_id = ?`,
+//         [pr.id]
+//       );
+
+//       // Fetch Plan Record Data
+//       const [planRecords] = await connection.query(
+//         `SELECT * FROM plan_records WHERE pr_id = ?`,
+//         [pr.id]
+//       );
+
+//       // Fetch Single PR Details
+//       const [singlePRDetails] = await connection.query(
+//         `SELECT * FROM single_pr_details WHERE pr_id = ?`,
+//         [pr.id]
+//       );
+
+//       // Add Related Data to PR Object
+//       pr.targetCountries = targetCountries.length ? targetCountries : [];
+//       pr.industryCategories = industryCategories.length
+//         ? industryCategories
+//         : [];
+//       pr.planRecords = planRecords.length ? planRecords : [];
+//       pr.singlePRDetails = singlePRDetails.length ? singlePRDetails : [];
+//     }
+
+//     res.status(200).json(prData);
+//   } catch (error) {
+//     console.error("Error fetching PRs:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal Server Error", error: error.message });
+//   }
+// };
+
 exports.getAllPRs = async (req, res) => {
   try {
     // Fetch all PR Data along with user and plan item data
     const [prData] = await connection.query(
-      `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at, pi.perma
+      `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.type, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at
        FROM pr_data pr
        JOIN auth_user au ON pr.user_id = au.auth_user_id
        JOIN plan_items pi ON pr.plan_id = pi.id
@@ -396,56 +462,46 @@ exports.getAllPRs = async (req, res) => {
       return res.status(404).json({ message: "No PRs found" });
     }
 
-    // Fetch Related Data for Each PR
     for (let pr of prData) {
-      // Fetch Target Countries & Translations for PR
-      const [targetCountries] = await connection.query(
-        `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
-         FROM pr_target_countries ptc
-         JOIN target_countries tc ON ptc.target_country_id = tc.id
-         LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
-         WHERE ptc.pr_id = ?`,
-        [pr.id]
-      );
-
-      // Fetch Industry Categories for PR
-      const [industryCategories] = await connection.query(
-        `SELECT ic.id, ic.categoryName, ic.categoryPrice
-         FROM pr_industry_categories pic
-         JOIN industry_categories ic ON pic.target_industry_id = ic.id
-         WHERE pic.pr_id = ?`,
-        [pr.id]
-      );
-
-      // Fetch Plan Record Data
-      const [planRecords] = await connection.query(
-        `SELECT * FROM plan_records WHERE pr_id = ?`,
-        [pr.id]
-      );
-
-      // Fetch Single PR Details
+      // Fetch related data for each single PR detail
       const [singlePRDetails] = await connection.query(
-        `SELECT * FROM single_pr_details WHERE pr_id = ?`,
+        `SELECT spd.* FROM single_pr_details spd WHERE spd.pr_id = ?`,
         [pr.id]
       );
 
-      // Add Related Data to PR Object
-      pr.targetCountries = targetCountries.length ? targetCountries : [];
-      pr.industryCategories = industryCategories.length
-        ? industryCategories
-        : [];
-      pr.planRecords = planRecords.length ? planRecords : [];
-      pr.singlePRDetails = singlePRDetails.length ? singlePRDetails : [];
+      for (let spd of singlePRDetails) {
+        const promises = [
+          connection.query(`SELECT c.* FROM companies c WHERE c.id = ?`, [spd.company_id]),
+          spd.pdf_id ? connection.query(`SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`, [spd.pdf_id]) : Promise.resolve([[]]),
+          connection.query(
+            `SELECT t.*, ut.url
+             FROM single_pr_tags spt
+             JOIN tags t ON spt.tag_id = t.id
+             JOIN pr_url_tags ut ON spt.single_pr_id = ut.single_pr_id
+             WHERE spt.single_pr_id = ?`,
+            [spd.id]
+          )
+        ];
+
+        const [company, pdfFile, tagsUrls] = await Promise.all(promises);
+        
+        spd.company = company.length ? company[0] : null;
+        spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
+        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : [];
+      }
+
+      // Add Single PR Details to PR Object
+      pr.singlePRDetails = singlePRDetails;
     }
 
     res.status(200).json(prData);
   } catch (error) {
     console.error("Error fetching PRs:", error);
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
+
 
 // ✅ **Update PR Order Status (SuperAdmin)**
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
