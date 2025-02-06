@@ -5,28 +5,42 @@ const crypto = require("crypto");
 const { transporter } = require("../config/transporter");
 require("dotenv").config();
 // Helper functions for AES encryption and decryption
+// Helper functions for AES encryption and decryption
 function encryptPassword(password) {
-  const algorithm = 'aes-128-cbc'; 
-  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 16); // 16 bytes for AES-128
+  if (!password) {
+    throw new Error("Password is required for encryption");
+  }
+  const algorithm = "aes-128-cbc";
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, "salt", 16); // Ensure the key is 16 bytes for AES-128
   const iv = crypto.randomBytes(16); // Initialization vector
 
   const cipher = crypto.createCipheriv(algorithm, key, iv);
-  let encrypted = cipher.update(password, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
+  let encrypted = cipher.update(password, "utf8", "hex");
+  encrypted += cipher.final("hex");
 
-  return { encrypted, iv: iv.toString('hex') };
+  return { encrypted, iv: iv.toString("hex") };
 }
 
-function decryptPassword(encrypted, ivHex) {
-  const algorithm = 'aes-128-cbc';
-  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 16);
-  const iv = Buffer.from(ivHex, 'hex');
+function decryptPassword(encryptedWithIV) {
+  try {
+    const [encrypted, ivHex] = encryptedWithIV.split(":");
+    const algorithm = "aes-128-cbc";
+    const key = crypto.scryptSync(
+      process.env.ENCRYPTION_KEY || "default_key",
+      "salt",
+      16
+    );
+    const iv = Buffer.from(ivHex, "hex");
 
-  const decipher = crypto.createDecipheriv(algorithm, key, iv);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    let decrypted = decipher.update(encrypted, "hex", "utf8");
+    decrypted += decipher.final("utf8");
 
-  return decrypted;
+    return decrypted;
+  } catch (error) {
+    console.error("Decryption error:", error);
+    return null; // or handle error appropriately
+  }
 }
 
 // Register a new user with role
@@ -36,19 +50,23 @@ exports.registerUser = async (req, res) => {
 
   try {
     dbConnection = await connection.getConnection();
-    await dbConnection.beginTransaction(); // Begin Transaction
+    console.log("Database connection successfully established.");
+    await dbConnection.beginTransaction();
+    console.log("Transaction started.");
 
     const [existingUser] = await dbConnection.query(
       "SELECT * FROM auth_user WHERE email = ?",
       [email]
     );
+    console.log("Checked for existing user:", existingUser);
     if (existingUser.length > 0) {
       return res.status(400).json({ message: "User already exists" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
-    const { encrypted, iv } = encryptPassword(password); // AES encryption
+    console.log("Password hashed.");
+    const { encrypted, iv } = encryptPassword(password); // Check this function's existence and correctness
 
     const [result] = await dbConnection.query(
       "INSERT INTO auth_user (username, email, password, aes_password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -56,25 +74,26 @@ exports.registerUser = async (req, res) => {
         username,
         email,
         password_hash,
-        `${encrypted}:${iv}`, // Store encrypted password and IV together
+        `${encrypted}:${iv}`, // Correct the column name if necessary
         role || "user",
         isAgency || false,
         "active",
       ]
     );
+    console.log("User inserted into database:", result);
 
-    // Handle token and email notifications as previously shown
-
-    await dbConnection.commit(); // Commit transaction
+    await dbConnection.commit();
+    console.log("Transaction committed.");
     res.status(201).json({
       message: "User registered successfully",
-      // Return additional user details if needed
     });
   } catch (error) {
-    if (dbConnection) await dbConnection.rollback(); // Rollback on error
+    console.error("Error during registration:", error);
+    if (dbConnection) await dbConnection.rollback();
     res.status(500).json({ error: "Error registering user" });
   } finally {
-    if (dbConnection) dbConnection.release(); // Release connection
+    if (dbConnection) dbConnection.release();
+    console.log("Database connection released.");
   }
 };
 
@@ -806,13 +825,52 @@ exports.getUserProfile = async (req, res) => {
 };
 
 // ✅ SuperAdmin - Get All Users API
+// exports.getAllUsers = async (req, res) => {
+//   try {
+//     // Fetch all users from auth_user table
+//     const [users] = await connection.query(
+//       `SELECT
+//         auth_user_id, username, email, role, isAgency, status, created_at
+//       FROM auth_user`
+//     );
+
+//     // Fetch user profiles
+//     const [profiles] = await connection.query(`SELECT * FROM user_profile`);
+
+//     // Create a user dictionary for easy mapping
+//     const profileMap = {};
+//     profiles.forEach((profile) => {
+//       profileMap[profile.user_id] = profile;
+//     });
+
+//     // Combine user data with profiles
+//     const allUsers = users.map((user) => ({
+//       id: user.auth_user_id,
+//       username: user.username,
+//       email: user.email,
+//       role: user.role,
+//       isAgency: user.isAgency === 0 ? false : true,
+//       status: user.status,
+//       createdAt: user.created_at,
+//       profile: profileMap[user.auth_user_id] || null, // Attach profile if exists
+//     }));
+
+//     res
+//       .status(200)
+//       .json({ message: "Users retrieved successfully", users: allUsers });
+//   } catch (error) {
+//     res.status(500).json({ error: "Error fetching users" });
+//   }
+// };
+
 exports.getAllUsers = async (req, res) => {
   try {
     // Fetch all users from auth_user table
     const [users] = await connection.query(
       `SELECT 
-        auth_user_id, username, email, role, isAgency, status, created_at 
-      FROM auth_user`
+        auth_user_id, username, email, role, isAgency, status, created_at, aes_password
+      FROM auth_user
+      ORDER BY auth_user_id DESC`
     );
 
     // Fetch user profiles
@@ -824,17 +882,25 @@ exports.getAllUsers = async (req, res) => {
       profileMap[profile.user_id] = profile;
     });
 
-    // Combine user data with profiles
-    const allUsers = users.map((user) => ({
-      id: user.auth_user_id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      isAgency: user.isAgency === 0 ? false : true,
-      status: user.status,
-      createdAt: user.created_at,
-      profile: profileMap[user.auth_user_id] || null, // Attach profile if exists
-    }));
+    // Decrypt each user's password and combine user data with profiles
+    const allUsers = users.map((user) => {
+      // Decrypt password
+      const decryptedPassword = user.aes_password
+        ? decryptPassword(user.aes_password)
+        : null;
+
+      return {
+        id: user.auth_user_id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        isAgency: user.isAgency === 0 ? false : true,
+        status: user.status,
+        createdAt: user.created_at,
+        decryptedPassword, // Decrypted password added
+        profile: profileMap[user.auth_user_id] || null, // Attach profile if exists
+      };
+    });
 
     res
       .status(200)
