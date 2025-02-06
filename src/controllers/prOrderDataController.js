@@ -314,19 +314,19 @@ exports.getUserPRs = async (req, res) => {
       // Fetch Target Countries & Translations for PR
       const [targetCountries] = await connection.query(
         `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
-         FROM pr_target_countries ptc
-         JOIN target_countries tc ON ptc.target_country_id = tc.id
-         LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
-         WHERE ptc.pr_id = ?`,
+               FROM pr_target_countries ptc
+               JOIN target_countries tc ON ptc.target_country_id = tc.id
+               LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
+               WHERE ptc.pr_id = ?`,
         [pr.id]
       );
 
       // Fetch Industry Categories for PR
       const [industryCategories] = await connection.query(
         `SELECT ic.id, ic.categoryName, ic.categoryPrice
-         FROM pr_industry_categories pic
-         JOIN industry_categories ic ON pic.target_industry_id = ic.id
-         WHERE pic.pr_id = ?`,
+               FROM pr_industry_categories pic
+               JOIN industry_categories ic ON pic.target_industry_id = ic.id
+               WHERE pic.pr_id = ?`,
         [pr.id]
       );
 
@@ -335,18 +335,47 @@ exports.getUserPRs = async (req, res) => {
         `SELECT * FROM plan_records WHERE pr_id = ?`,
         [pr.id]
       );
+
       // Fetch Single PR Details
       const [singlePRDetails] = await connection.query(
         `SELECT * FROM single_pr_details WHERE pr_id = ?`,
         [pr.id]
       );
-      // Add Related Data to PR Object
-      pr.targetCountries = targetCountries.length ? targetCountries : [];
-      pr.industryCategories = industryCategories.length
-        ? industryCategories
-        : [];
-      pr.planRecords = planRecords.length ? planRecords : [];
-      pr.singlePRDetails = singlePRDetails.length ? singlePRDetails : [];
+
+      for (let spd of singlePRDetails) {
+        const promises = [
+          connection.query(`SELECT c.* FROM companies c WHERE c.id = ?`, [
+            spd.company_id,
+          ]),
+          spd.pdf_id
+            ? connection.query(
+                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+                [spd.pdf_id]
+              )
+            : Promise.resolve([[]]),
+          connection.query(
+            `SELECT t.*, ut.url
+             FROM single_pr_tags spt
+             JOIN tags t ON spt.tag_id = t.id
+             JOIN pr_url_tags ut ON spt.single_pr_id = ut.single_pr_id
+             WHERE spt.single_pr_id = ?`,
+            [spd.id]
+          ),
+        ];
+
+        const [company, pdfFile, tagsUrls] = await Promise.all(promises);
+        pr.targetCountries = targetCountries.length ? targetCountries : [];
+        pr.industryCategories = industryCategories.length
+          ? industryCategories
+          : [];
+        pr.planRecords = planRecords.length ? planRecords : [];
+        spd.company = company.length ? company[0] : null;
+        spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
+        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : [];
+      }
+
+      // Add Single PR Details to PR Object
+      pr.singlePRDetails = singlePRDetails;
     }
 
     res.status(200).json(prData);
