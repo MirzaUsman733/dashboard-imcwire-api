@@ -561,7 +561,8 @@ exports.superadminUpdateUser = async (req, res) => {
       updates,
     });
   } catch (error) {
-    return res.status(500).json({ error: "Error updating user role/status" });
+    console.log(error)
+    return res.status(500).json({ error: "Error updating user role/status", error });
   }
 };
 

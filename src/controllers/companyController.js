@@ -148,6 +148,28 @@ exports.getUserCompanies = async (req, res) => {
   }
 };
 
+exports.getUserCompanyNames = async (req, res) => {
+  let dbConnection;
+
+  try {
+    dbConnection = await connection.getConnection(); // Get a DB connection from the pool
+
+    const [companies] = await dbConnection.query(
+      "SELECT id, companyName FROM companies WHERE user_id = ? ORDER BY created_at DESC",
+      [req.user.id]
+    );
+
+    res.status(200).json(companies);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) dbConnection.release(); // Release the connection back to the pool
+  }
+};
+
+
 // ✅ **Get company details by ID**
 exports.getCompanyById = async (req, res) => {
   try {

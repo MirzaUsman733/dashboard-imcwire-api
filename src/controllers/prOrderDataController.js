@@ -351,6 +351,31 @@ exports.getUserPRs = async (req, res) => {
   }
 };
 
+exports.getUserPRsIds = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Fetch only PR ID and User ID (Client ID)
+    const [prData] = await connection.query(
+      `SELECT pr.id AS pr_id, pr.client_id AS order_id 
+       FROM pr_data pr
+       WHERE pr.user_id = ?
+       ORDER BY pr.created_at DESC`,
+      [userId]
+    );
+
+    if (prData.length === 0) {
+      return res.status(404).json({ message: "No PRs found" });
+    }
+
+    res.status(200).json(prData);
+  } catch (error) {
+    console.error("Error fetching PRs:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
 // ✅ **Retrieve All PRs (SuperAdmin Only)**
 exports.getAllPRs = async (req, res) => {
   try {

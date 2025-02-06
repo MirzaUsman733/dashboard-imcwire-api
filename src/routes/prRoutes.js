@@ -70,6 +70,13 @@ router.get(
 );
 
 router.get(
+  "/user-order-ids",
+  apiKeyMiddleware,
+  authMiddleware,
+  prOrderDataController.getUserPRsIds
+);
+
+router.get(
   "/user-order/:userId",
   apiKeyMiddleware,
   SuperAdminAuthMiddleware,
