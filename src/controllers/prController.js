@@ -43,7 +43,7 @@ exports.submitSinglePR = async (req, res) => {
     // ✅ 2. Validate PR Ownership, Payment, and Approval
     if (pr.user_id !== user_id)
       return res.status(403).json({ message: "Unauthorized PR access." });
-    if (pr.payment_status !== "paid")
+    if (pr.payment_status === "unpaid")
       return res.status(400).json({ message: "PR not paid." });
     if (pr.payment_status === "refund")
       return res
@@ -248,7 +248,7 @@ exports.updateSinglePR = async (req, res) => {
     // ✅ 2. Validate PR Ownership, Payment, and Approval
     if (pr.user_id !== user_id)
       return res.status(403).json({ message: "Unauthorized PR access." });
-    if (pr.payment_status !== "paid")
+    if (pr.payment_status === "unpaid")
       return res.status(400).json({ message: "PR not paid." });
 
     // ✅ 3. Check Company Ownership

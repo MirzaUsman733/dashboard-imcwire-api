@@ -357,9 +357,9 @@ exports.getUserPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -560,9 +560,9 @@ exports.getAllPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -615,12 +615,12 @@ exports.getAllPRs = async (req, res) => {
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
   try {
     const { prId } = req.params; // Extract the PR ID from route parameters
-    const { newStatus } = req.body; // Extract the new status from the request body
+    const { newStatus, newPaymentStatus } = req.body; // Extract the new status and new payment status from the request body
 
-    if (!prId || !newStatus) {
+    if (!prId || !newStatus || !newPaymentStatus) {
       return res
         .status(400)
-        .json({ message: "PR ID and new status are required" });
+        .json({ message: "PR ID, new status, and new payment status are required" });
     }
 
     // ✅ Check if the PR exists and fetch user_id
@@ -634,14 +634,14 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
     }
     const userId = existingPRs[0].user_id; // Assuming PR is associated with a single user
 
-    // ✅ Update the status of the PR data
+    // ✅ Update the status and payment status of the PR data
     const updateResult = await connection.query(
-      "UPDATE pr_data SET pr_status = ? WHERE id = ?",
-      [newStatus, prId]
+      "UPDATE pr_data SET pr_status = ?, payment_status = ? WHERE id = ?",
+      [newStatus, newPaymentStatus, prId]
     );
 
     if (updateResult.affectedRows === 0) {
-      return res.status(404).json({ message: "No change in status" });
+      return res.status(404).json({ message: "No change in status or payment status" });
     }
 
     // ✅ Add notification for the user
@@ -649,20 +649,21 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
       "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
       [
         userId,
-        `PR Order ${prId} Status Updated`,
-        `Your PR Order ${prId} status has been updated to ${newStatus}.`,
+        `PR Order ${prId} Status and Payment Updated`,
+        `Your PR Order ${prId} status has been updated to ${newStatus} and payment status to ${newPaymentStatus}.`
       ]
     );
 
     res
       .status(200)
-      .json({ message: "PR status updated successfully, notification sent" });
+      .json({ message: "PR status and payment status updated successfully, notification sent" });
   } catch (error) {
     res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 // ✅ **Retrieve PRs for Logged-in User**
 exports.getUserPRsById = async (req, res) => {
@@ -735,9 +736,9 @@ exports.getUserPRsById = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -1144,17 +1145,17 @@ exports.getCustomOrder = async (req, res) => {
       industryCategories,
       planData: planData
         ? {
-            plan_id: planData.id,
-            planName: planData.planName,
-            perma: planData.perma,
-            totalPlanPrice: planData.totalPlanPrice,
-            priceSingle: planData.priceSingle,
-            planDescription: planData.planDescription,
-            pdfLink: planData.pdfLink,
-            numberOfPR: planData.numberOfPR,
-            activate_plan: planData.activate_plan,
-            type: planData.type,
-          }
+          plan_id: planData.id,
+          planName: planData.planName,
+          perma: planData.perma,
+          totalPlanPrice: planData.totalPlanPrice,
+          priceSingle: planData.priceSingle,
+          planDescription: planData.planDescription,
+          pdfLink: planData.pdfLink,
+          numberOfPR: planData.numberOfPR,
+          activate_plan: planData.activate_plan,
+          type: planData.type,
+        }
         : null,
       invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.perma}`,
     };
@@ -1220,16 +1221,16 @@ exports.getAllCustomOrders = async (req, res) => {
         invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${order.perma}`,
         plan: order.planName
           ? {
-              plan_id: order.plan_id,
-              planName: order.planName,
-              totalPlanPrice: order.totalPlanPrice,
-              priceSingle: order.priceSingle,
-              planDescription: order.planDescription,
-              pdfLink: order.pdfLink,
-              numberOfPR: order.numberOfPR,
-              activate_plan: order.activate_plan,
-              type: order.type,
-            }
+            plan_id: order.plan_id,
+            planName: order.planName,
+            totalPlanPrice: order.totalPlanPrice,
+            priceSingle: order.priceSingle,
+            planDescription: order.planDescription,
+            pdfLink: order.pdfLink,
+            numberOfPR: order.numberOfPR,
+            activate_plan: order.activate_plan,
+            type: order.type,
+          }
           : null,
         targetCountries: [],
         industryCategories: [],
