@@ -141,6 +141,13 @@ router.get(
 );
 
 router.get(
+  "/get-single-pr/superadmin/statuses",
+  apiKeyMiddleware,
+  SuperAdminAuthMiddleware,
+  prController.getAllPRStatusCounts
+);
+
+router.get(
   "/single-pr-detail/:single_pr_id",
   apiKeyMiddleware,
   authMiddleware,

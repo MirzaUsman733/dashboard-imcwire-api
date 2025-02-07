@@ -617,10 +617,10 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
     const { prId } = req.params; // Extract the PR ID from route parameters
     const { newStatus, newPaymentStatus } = req.body; // Extract the new status and new payment status from the request body
 
-    if (!prId || !newStatus || !newPaymentStatus) {
+    if (!prId) {
       return res
         .status(400)
-        .json({ message: "PR ID, new status, and new payment status are required" });
+        .json({ message: "PR ID is required for update the order " });
     }
 
     // ✅ Check if the PR exists and fetch user_id

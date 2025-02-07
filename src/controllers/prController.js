@@ -335,7 +335,7 @@ exports.updateSinglePR = async (req, res) => {
 
         const client = new Client();
         await client.access(ftpConfig);
-        await client.remove(oldFilePath).catch(() => {}); // Ignore error if file doesn't exist
+        await client.remove(oldFilePath).catch(() => { }); // Ignore error if file doesn't exist
         client.close();
       }
 
@@ -596,6 +596,49 @@ exports.getUserPRStatusCounts = async (req, res) => {
       WHERE user_id = ?
       GROUP BY status`,
       [user_id]
+    );
+
+    // ✅ Format response
+    const statusSummary = {
+      "Not Started": 0,
+      Pending: 0,
+      Approved: 0,
+      "In Progress": 0,
+      Published: 0,
+    };
+
+    // ✅ Populate counts dynamically
+    statusCounts.forEach((row) => {
+      statusSummary[row.status] = row.count;
+    });
+
+    res.status(200).json({
+      message: "PR status counts retrieved successfully.",
+      data: statusSummary,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) {
+      dbConnection.release();
+    }
+  }
+};
+
+exports.getAllPRStatusCounts = async (req, res) => {
+  let dbConnection;
+
+  try {
+    dbConnection = await connection.getConnection();
+
+    // ✅ Count PRs based on their status for the authenticated user
+    const [statusCounts] = await dbConnection.query(
+      `SELECT 
+        status, COUNT(*) AS count
+      FROM single_pr_details
+      GROUP BY status`
     );
 
     // ✅ Format response
