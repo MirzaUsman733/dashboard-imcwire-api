@@ -3,6 +3,7 @@ const connection = require("../config/dbconfig");
 const { v4: uuidv4 } = require("uuid");
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
+
 exports.submitPR = async (req, res) => {
   const {
     plan_id,
@@ -19,21 +20,63 @@ exports.submitPR = async (req, res) => {
   // Generate a random client_id
   const client_id = uuidv4();
 
-  if (
-    !plan_id ||
-    !prType ||
-    !payment_method ||
-    !targetCountries.length ||
-    !industryCategories.length ||
-    !total_price ||
-    !pr_status ||
-    !payment_status ||
-    !ip_address
-  ) {
-    return res.status(400).json({ message: "Missing required fields" });
+  // Validate main required fields
+  const missingFields = [];
+  if (!plan_id) missingFields.push("plan_id");
+  if (!prType) missingFields.push("prType");
+  if (!payment_method) missingFields.push("payment_method");
+  if (!targetCountries || !Array.isArray(targetCountries) || targetCountries.length === 0)
+    missingFields.push("targetCountries (should be a non-empty array)");
+  if (!industryCategories || !Array.isArray(industryCategories) || industryCategories.length === 0)
+    missingFields.push("industryCategories (should be a non-empty array)");
+  if (!total_price) missingFields.push("total_price");
+  if (!pr_status) missingFields.push("pr_status");
+  if (!payment_status) missingFields.push("payment_status");
+  if (!ip_address) missingFields.push("ip_address");
+
+  if (missingFields.length > 0) {
+    return res
+      .status(400)
+      .json({ message: "Missing required fields: " + missingFields.join(", ") });
   }
+
+  // Validate each target country object
+  const targetCountryErrors = [];
+  targetCountries.forEach((country, index) => {
+    if (!country.name) {
+      targetCountryErrors.push(`targetCountries[${index}].name is missing.`);
+    }
+    if (country.price === undefined || country.price === null) {
+      targetCountryErrors.push(`targetCountries[${index}].price is missing.`);
+    }
+    if (country.translationRequired) {
+      if (country.translationPrice === undefined || country.translationPrice === null) {
+        targetCountryErrors.push(
+          `targetCountries[${index}].translationPrice is missing while translationRequired is provided.`
+        );
+      }
+    }
+  });
+
+  // Validate each industry category object
+  const industryCategoryErrors = [];
+  industryCategories.forEach((category, index) => {
+    if (!category.name) {
+      industryCategoryErrors.push(`industryCategories[${index}].name is missing.`);
+    }
+    if (category.price === undefined || category.price === null) {
+      industryCategoryErrors.push(`industryCategories[${index}].price is missing.`);
+    }
+  });
+
+  // If there are errors in the arrays, return them
+  if (targetCountryErrors.length > 0 || industryCategoryErrors.length > 0) {
+    const errors = [...targetCountryErrors, ...industryCategoryErrors].join(" ");
+    return res.status(400).json({ message: "Validation errors: " + errors });
+  }
+
   // If the total amount is greater than $250, only allow Stripe
-  if (total_price > 250 && payment_method === "Paypro") {
+  if (Number(total_price) > 250 && payment_method === "Paypro") {
     return res.status(400).json({
       message: "For transactions above $250, only Stripe is allowed.",
     });
@@ -44,30 +87,34 @@ exports.submitPR = async (req, res) => {
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction(); // Begin Transaction
 
-    // ✅ 1. Fetch User Email from `auth_user`
+    // 1. Fetch User Email from `auth_user`
     const [userResult] = await dbConnection.query(
       "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
       [req.user.id]
     );
 
     if (userResult.length === 0) {
+      await dbConnection.rollback();
       return res.status(404).json({ message: "User email not found." });
     }
 
     const userEmail = userResult[0].email;
     let username = userResult[0].username;
     username = username.replace(/[^a-zA-Z\s]/g, "").trim();
-    // ✅ 2. Check if the plan is activated
+
+    // 2. Check if the plan is activated
     const [planItem] = await dbConnection.query(
       "SELECT numberOfPR, activate_plan FROM plan_items WHERE id = ?",
       [plan_id]
     );
 
     if (planItem.length === 0) {
-      return res.status(400).json({ message: "Plan details not found." });
+      await dbConnection.rollback();
+      return res.status(404).json({ message: "Plan details not found." });
     }
 
     if (planItem[0].activate_plan !== 1) {
+      await dbConnection.rollback();
       return res
         .status(403)
         .json({ message: "The selected plan is not activated yet." });
@@ -75,7 +122,7 @@ exports.submitPR = async (req, res) => {
 
     const totalPrs = planItem[0].numberOfPR;
 
-    // ✅ 5. Insert Multiple Target Countries with Individual Translations
+    // 3. Insert Multiple Target Countries with Individual Translations
     let targetCountryIds = [];
     for (const country of targetCountries) {
       let translationId = null;
@@ -84,7 +131,6 @@ exports.submitPR = async (req, res) => {
           "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
           [country.translationRequired, country.translationPrice]
         );
-
         translationId = translationResult.insertId;
       }
 
@@ -95,7 +141,7 @@ exports.submitPR = async (req, res) => {
       targetCountryIds.push(targetCountryResult.insertId);
     }
 
-    // ✅ 6. Insert Multiple Industry Categories
+    // 4. Insert Multiple Industry Categories
     let industryCategoryIds = [];
     for (const category of industryCategories) {
       const [industryCategoryResult] = await dbConnection.query(
@@ -104,7 +150,8 @@ exports.submitPR = async (req, res) => {
       );
       industryCategoryIds.push(industryCategoryResult.insertId);
     }
-    // ✅ 7. Insert PR Data
+
+    // 5. Insert PR Data
     const [prResult] = await dbConnection.query(
       "INSERT INTO pr_data (client_id, user_id, plan_id, prType, pr_status, payment_method, total_price, payment_status, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
@@ -120,13 +167,14 @@ exports.submitPR = async (req, res) => {
       ]
     );
     const prId = prResult.insertId;
-    // Store plan records without using its ID later
+
+    // 6. Store plan records (recording PR usage)
     await dbConnection.query(
       "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs, pr_id) VALUES (?, ?, ?, ?, ?)",
-      [req.user.id, plan_id, totalPrs, 1, prId] // Assuming `prId` is generated from previous PR insert
+      [req.user.id, plan_id, totalPrs, 1, prId]
     );
 
-    // ✅ 8. Link PR to Multiple Target Countries
+    // 7. Link PR to Multiple Target Countries
     for (const countryId of targetCountryIds) {
       await dbConnection.query(
         "INSERT INTO pr_target_countries (pr_id, target_country_id) VALUES (?, ?)",
@@ -134,23 +182,25 @@ exports.submitPR = async (req, res) => {
       );
     }
 
-    // ✅ 9. Link PR to Multiple Industry Categories
+    // 8. Link PR to Multiple Industry Categories
     for (const categoryId of industryCategoryIds) {
       await dbConnection.query(
         "INSERT INTO pr_industry_categories (pr_id, target_industry_id) VALUES (?, ?)",
         [prId, categoryId]
       );
     }
+
+    // 9. Payment Integration
     let paymentUrl;
     if (payment_method === "Stripe") {
-      // Stripe Checkout Session
+      // Create a Stripe Checkout Session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
               currency: "usd",
-              unit_amount: total_price * 100,
+              unit_amount: Number(total_price) * 100, // Convert dollars to cents
               product_data: {
                 name: "Press Release",
               },
@@ -166,26 +216,26 @@ exports.submitPR = async (req, res) => {
       });
       paymentUrl = session.url;
     } else if (payment_method === "Paypro") {
-      // PayPro Payment
-      const authResponse = await fetch(
-        `${process.env.Paypro_URL}/v2/ppro/auth`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clientid: process.env.clientid,
-            clientsecret: process.env.clientsecret,
-          }),
-        }
-      );
+      // Authenticate with Paypro
+      const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientid: process.env.clientid,
+          clientsecret: process.env.clientsecret,
+        }),
+      });
       if (!authResponse.ok) {
-        return res.status(401).json({ message: "Authentication failed" });
+        await dbConnection.rollback();
+        return res.status(401).json({ message: "Authentication failed with Paypro." });
       }
-      const token = authResponse.headers.get("Token");
-      if (!token) {
-        return res.status(401).json({ message: "Unauthorized" });
+      const tokenFromPaypro = authResponse.headers.get("Token");
+      if (!tokenFromPaypro) {
+        await dbConnection.rollback();
+        return res.status(401).json({ message: "Unauthorized: No token received from Paypro." });
       }
 
+      // Prepare order details for Paypro
       const issueDate = new Date().toISOString().split("T")[0];
       const orderDueDate = new Date();
       orderDueDate.setDate(orderDueDate.getDate() + 1);
@@ -207,37 +257,42 @@ exports.submitPR = async (req, res) => {
         },
       ];
 
-      const orderResponse = await fetch(
-        `${process.env.Paypro_URL}/v2/ppro/co`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Token: token },
-          body: JSON.stringify(orderPayload),
-        }
-      );
+      // Create order with Paypro
+      const orderResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/co`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Token: tokenFromPaypro },
+        body: JSON.stringify(orderPayload),
+      });
       const result = await orderResponse.json();
       if (orderResponse.ok && result[0]?.Status === "00") {
         paymentUrl = `${result[1]?.Click2Pay}&callback_url=https://dashboard.imcwire.com/thankyou`;
       } else {
-        return res.status(500).json({ message: "Order creation failed" });
+        await dbConnection.rollback();
+        return res.status(500).json({
+          message: "Order creation failed with Paypro.",
+          details: result,
+        });
       }
     } else {
+      await dbConnection.rollback();
       return res.status(500).json({ message: "Payment Method is Incorrect" });
     }
+
+    // Commit the transaction if all operations succeeded
     await dbConnection.commit();
-    res.status(201).json({
+    return res.status(201).json({
       message: "We are redirecting you to the payment page.",
       paymentUrl,
     });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    console.error("Error in submitPR:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
   } finally {
-    if (dbConnection) dbConnection.release();
+    if (dbConnection) await dbConnection.release();
   }
 };
+
 
 // ✅ **Retrieve PRs for Logged-in User**
 // exports.getUserPRs = async (req, res) => {
@@ -431,73 +486,6 @@ exports.getUserPRsIds = async (req, res) => {
   }
 };
 
-// ✅ **Retrieve All PRs (SuperAdmin Only)**
-// exports.getAllPRs = async (req, res) => {
-//   try {
-//     // Fetch all PR Data along with user and plan item data
-//     const [prData] = await connection.query(
-//       `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at, pi.perma
-//        FROM pr_data pr
-//        JOIN auth_user au ON pr.user_id = au.auth_user_id
-//        JOIN plan_items pi ON pr.plan_id = pi.id
-//        ORDER BY pr.created_at DESC`
-//     );
-
-//     if (prData.length === 0) {
-//       return res.status(404).json({ message: "No PRs found" });
-//     }
-
-//     // Fetch Related Data for Each PR
-//     for (let pr of prData) {
-//       // Fetch Target Countries & Translations for PR
-//       const [targetCountries] = await connection.query(
-//         `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
-//          FROM pr_target_countries ptc
-//          JOIN target_countries tc ON ptc.target_country_id = tc.id
-//          LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
-//          WHERE ptc.pr_id = ?`,
-//         [pr.id]
-//       );
-
-//       // Fetch Industry Categories for PR
-//       const [industryCategories] = await connection.query(
-//         `SELECT ic.id, ic.categoryName, ic.categoryPrice
-//          FROM pr_industry_categories pic
-//          JOIN industry_categories ic ON pic.target_industry_id = ic.id
-//          WHERE pic.pr_id = ?`,
-//         [pr.id]
-//       );
-
-//       // Fetch Plan Record Data
-//       const [planRecords] = await connection.query(
-//         `SELECT * FROM plan_records WHERE pr_id = ?`,
-//         [pr.id]
-//       );
-
-//       // Fetch Single PR Details
-//       const [singlePRDetails] = await connection.query(
-//         `SELECT * FROM single_pr_details WHERE pr_id = ?`,
-//         [pr.id]
-//       );
-
-//       // Add Related Data to PR Object
-//       pr.targetCountries = targetCountries.length ? targetCountries : [];
-//       pr.industryCategories = industryCategories.length
-//         ? industryCategories
-//         : [];
-//       pr.planRecords = planRecords.length ? planRecords : [];
-//       pr.singlePRDetails = singlePRDetails.length ? singlePRDetails : [];
-//     }
-
-//     res.status(200).json(prData);
-//   } catch (error) {
-//     console.error("Error fetching PRs:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// };
-
 exports.getAllPRs = async (req, res) => {
   try {
     // Fetch all PR Data along with user and plan item data
@@ -614,8 +602,8 @@ exports.getAllPRs = async (req, res) => {
 // ✅ **Update PR Order Status (SuperAdmin)**
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
   try {
-    const { prId } = req.params; // Extract the PR ID from route parameters
-    const { newStatus, newPaymentStatus } = req.body; // Extract the new status and new payment status from the request body
+    const { prId } = req.params;
+    const { newStatus, newPaymentStatus } = req.body;
 
     if (!prId) {
       return res

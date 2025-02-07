@@ -54,6 +54,252 @@ const deleteFromFTP = async (filePath) => {
 };
 
 // ✅ Create Report and Upload Files in One API (Ensuring Ownership & One Report per `single_pr_id`)
+// exports.createFullReport = async (req, res) => {
+//   let dbConnection;
+
+//   try {
+//     const { pr_id, single_pr_id, title, user_id } = req.body;
+//     const pdfFile = req.files["pdf"] ? req.files["pdf"][0] : null;
+//     const excelFile = req.files["excel"] ? req.files["excel"][0] : null;
+
+//     if (!pr_id || !single_pr_id || !title || (!pdfFile && !excelFile)) {
+//       return res.status(400).json({
+//         message:
+//           "Missing required fields (PR ID, Single PR ID, Title, and at least one file).",
+//       });
+//     }
+
+//     dbConnection = await connection.getConnection();
+//     await dbConnection.beginTransaction();
+
+//     // ✅ Check if a report already exists for this `single_pr_id`
+//     const [existingReport] = await dbConnection.query(
+//       "SELECT id FROM reports WHERE single_pr_id = ?",
+//       [single_pr_id]
+//     );
+
+//     if (existingReport.length > 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "A report has already been created for this PR." });
+//     }
+
+//     // ✅ Validate PR & Single PR Submission Ownership
+//     const [prData] = await dbConnection.query(
+//       "SELECT id FROM pr_data WHERE id = ? AND user_id = ?",
+//       [pr_id, user_id]
+//     );
+//     const [singlePrData] = await dbConnection.query(
+//       "SELECT id, status FROM single_pr_details WHERE id = ? AND user_id = ?",
+//       [single_pr_id, user_id]
+//     );
+
+//     if (prData.length === 0 || singlePrData.length === 0) {
+//       return res.status(403).json({
+//         message: "You do not have permission to create a report for this PR.",
+//       });
+//     }
+//     // ✅ Check if the `single_pr_details` is Approved
+//     if (singlePrData[0].status !== "Approved") {
+//       return res
+//         .status(400)
+//         .json({ message: "You can only create a report for an Approved PR." });
+//     }
+//     // ✅ Fetch User Details (Name & Email)
+//     const [userData] = await dbConnection.query(
+//       "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
+//       [user_id]
+//     );
+//     if (userData.length === 0) {
+//       return res.status(404).json({ message: "User not found." });
+//     }
+
+//     const username = userData[0].username;
+//     const userEmail = userData[0].email;
+//     // ✅ Insert Report
+//     const [reportResult] = await dbConnection.query(
+//       "INSERT INTO reports (title, pr_id, single_pr_id, user_id) VALUES (?, ?, ?, ?)",
+//       [title, pr_id, single_pr_id, user_id]
+//     );
+//     const reportId = reportResult.insertId;
+
+//     const ftpFolderPath = `/public_html/files/uploads/reports`;
+//     // ✅ Declare the paths outside the conditions
+//     let pdfFtpPath = "";
+//     let excelFtpPath = "";
+//     if (pdfFile) {
+//       // ✅ Handle PDF Upload Directly to FTP
+//       const pdfUniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
+//       const sanitizedPdfName = pdfFile.originalname.replace(
+//         /[^a-zA-Z0-9.-]/g,
+//         "-"
+//       );
+//       const pdfFileName = `${pdfUniqueId}_${sanitizedPdfName}`;
+//       pdfFtpPath = await uploadToFTP(
+//         pdfFile.buffer,
+//         pdfFileName,
+//         ftpFolderPath
+//       );
+
+//       // ✅ Save PDF in `pr_pdf_files` and Get `pr_pdf_id`
+//       const [pdfInsertResult] = await dbConnection.query(
+//         "INSERT INTO pr_pdf_files (single_pr_id, unique_id, pdf_file, url) VALUES (?, ?, ?, ?)",
+//         [
+//           single_pr_id,
+//           pdfUniqueId,
+//           pdfFileName,
+//           pdfFtpPath.replace("/public_html/files", ""),
+//         ]
+//       );
+//       const prPdfId = pdfInsertResult.insertId;
+
+//       // ✅ Save PDF Reference in `report_pr_pdfs`
+//       await dbConnection.query(
+//         "INSERT INTO report_pr_pdfs (report_id, pr_pdf_id, pdf_name, pdf_url) VALUES (?, ?, ?, ?)",
+//         [
+//           reportId,
+//           prPdfId,
+//           sanitizedPdfName,
+//           pdfFtpPath.replace("/public_html/files", ""),
+//         ]
+//       );
+//     }
+
+//     if (excelFile) {
+//       // ✅ Handle Excel Upload Directly to FTP
+//       const excelUniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
+//       const sanitizedExcelName = excelFile.originalname.replace(
+//         /[^a-zA-Z0-9.-]/g,
+//         "-"
+//       );
+//       const excelFileName = `${excelUniqueId}_${sanitizedExcelName}`;
+//       excelFtpPath = await uploadToFTP(
+//         excelFile.buffer,
+//         excelFileName,
+//         ftpFolderPath
+//       );
+
+//       // ✅ Save Excel Record in MySQL
+//       await dbConnection.query(
+//         "INSERT INTO report_excel_files (report_id, excel_name, excel_url) VALUES (?, ?, ?)",
+//         [
+//           reportId,
+//           sanitizedExcelName,
+//           excelFtpPath.replace("/public_html/files", ""),
+//         ]
+//       );
+//     }
+//     // ✅ Update `single_pr_details` status to "Report Created"
+//     await dbConnection.query(
+//       "UPDATE single_pr_details SET status = 'Published' WHERE id = ?",
+//       [single_pr_id]
+//     );
+//     const reportMailOptions = {
+//       from: "IMCWire <Orders@imcwire.com>",
+//       to: userEmail,
+//       subject: "Your Report Has Been Successfully Uploaded - IMCWire",
+//       html: `
+//        <!DOCTYPE html>
+//           <html>
+//             <head>
+//             <meta charset="UTF-8">
+//             <title>Report Upload Confirmation</title>
+//           <style>
+//             body {
+//                 font-family: Arial, sans-serif;
+//                 background-color: #f4f4f4;
+//                 margin: 0;
+//                 padding: 0;
+//             }
+//             .container {
+//                 width: 80%;
+//                 max-width: 600px;
+//                 margin: 20px auto;
+//                 background: #ffffff;
+//                 padding: 20px;
+//                 border-radius: 8px;
+//                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+//             }
+//             .header {
+//                 background: #004085;
+//                 color: #ffffff;
+//                 text-align: center;
+//                 padding: 10px;
+//                 font-size: 20px;
+//                 border-radius: 8px 8px 0 0;
+//             }
+//             .content {
+//                 padding: 20px;
+//                 line-height: 1.6;
+//                 color: #333333;
+//             }
+//             .footer {
+//                 text-align: center;
+//                 padding: 10px;
+//                 font-size: 12px;
+//                 color: #777777;
+//             }
+//             .button {
+//                 display: inline-block;
+//                 background: #004085;
+//                 color: #ffffff;
+//                 padding: 10px 20px;
+//                 text-decoration: none;
+//                 border-radius: 5px;
+//                 margin-top: 10px;
+//             }
+//             </style>
+//         </head>
+//         <body>
+
+//             <div class="container">
+//                 <div class="header">
+//                     Report Successfully Uploaded
+//                 </div>
+//                 <div class="content">
+//                     <p>Dear <strong>${username}</strong>,</p>
+//                     <p>Your report titled <strong>${title}</strong> has been successfully uploaded and published under PR Number.</p>
+//                     <p>You can check the details of your report in your dashboard.</p>
+//                     <p>Additionally, you can download the published report in the following formats:</p>
+//                     <p>
+//                         <a href="${pdfFtpPath.replace(
+//         "/public_html/files",
+//         ""
+//       )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+//                         <a href="${excelFtpPath.replace(
+//         "/public_html/files",
+//         ""
+//       )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+//                     </p>
+//                     <p>If you have any questions, feel free to contact our support team.</p>
+//                     <p>Best Regards,</p>
+//                     <p><strong>IMCWire Team</strong></p>
+//                 </div>
+//                 <div class="footer">
+//                     &copy; 2025 IMCWire. All rights reserved.
+//                 </div>
+//             </div>
+//             </body>
+//             </html>
+
+//       `,
+//     };
+//     await transporter.sendMail(reportMailOptions);
+//     await dbConnection.commit();
+
+//     res.status(201).json({
+//       message: "Report and files uploaded successfully.",
+//       report_id: reportId,
+//     });
+//   } catch (error) {
+//     if (dbConnection) await dbConnection.rollback();
+//     res.status(500).json({ message: "Internal Server Error" });
+//   } finally {
+//     if (dbConnection) dbConnection.release();
+//   }
+// };
+
+
 exports.createFullReport = async (req, res) => {
   let dbConnection;
 
@@ -99,12 +345,14 @@ exports.createFullReport = async (req, res) => {
         message: "You do not have permission to create a report for this PR.",
       });
     }
+
     // ✅ Check if the `single_pr_details` is Approved
     if (singlePrData[0].status !== "Approved") {
       return res
         .status(400)
         .json({ message: "You can only create a report for an Approved PR." });
     }
+
     // ✅ Fetch User Details (Name & Email)
     const [userData] = await dbConnection.query(
       "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
@@ -116,6 +364,7 @@ exports.createFullReport = async (req, res) => {
 
     const username = userData[0].username;
     const userEmail = userData[0].email;
+
     // ✅ Insert Report
     const [reportResult] = await dbConnection.query(
       "INSERT INTO reports (title, pr_id, single_pr_id, user_id) VALUES (?, ?, ?, ?)",
@@ -127,6 +376,7 @@ exports.createFullReport = async (req, res) => {
     // ✅ Declare the paths outside the conditions
     let pdfFtpPath = "";
     let excelFtpPath = "";
+
     if (pdfFile) {
       // ✅ Handle PDF Upload Directly to FTP
       const pdfUniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
@@ -189,29 +439,41 @@ exports.createFullReport = async (req, res) => {
         ]
       );
     }
-    // ✅ Update `single_pr_details` status to "Report Created"
+
+    // ✅ Update `single_pr_details` status to "Published"
     await dbConnection.query(
       "UPDATE single_pr_details SET status = 'Published' WHERE id = ?",
       [single_pr_id]
     );
+
+    // ✅ Insert Notification into the notifications table
+    await dbConnection.query(
+      "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
+      [
+        user_id,
+        `Report Created for PR ${single_pr_id}`,
+        `Your report for PR ${single_pr_id} has been successfully created and published.`
+      ]
+    );
+
     const reportMailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
       to: userEmail,
       subject: "Your Report Has Been Successfully Uploaded - IMCWire",
       html: `
-       <!DOCTYPE html>
-          <html>
-            <head>
+        <!DOCTYPE html>
+        <html>
+          <head>
             <meta charset="UTF-8">
             <title>Report Upload Confirmation</title>
-          <style>
-            body {
+            <style>
+              body {
                 font-family: Arial, sans-serif;
                 background-color: #f4f4f4;
                 margin: 0;
                 padding: 0;
-            }
-            .container {
+              }
+              .container {
                 width: 80%;
                 max-width: 600px;
                 margin: 20px auto;
@@ -219,27 +481,27 @@ exports.createFullReport = async (req, res) => {
                 padding: 20px;
                 border-radius: 8px;
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            }
-            .header {
+              }
+              .header {
                 background: #004085;
                 color: #ffffff;
                 text-align: center;
                 padding: 10px;
                 font-size: 20px;
                 border-radius: 8px 8px 0 0;
-            }
-            .content {
+              }
+              .content {
                 padding: 20px;
                 line-height: 1.6;
                 color: #333333;
-            }
-            .footer {
+              }
+              .footer {
                 text-align: center;
                 padding: 10px;
                 font-size: 12px;
                 color: #777777;
-            }
-            .button {
+              }
+              .button {
                 display: inline-block;
                 background: #004085;
                 color: #ffffff;
@@ -247,43 +509,36 @@ exports.createFullReport = async (req, res) => {
                 text-decoration: none;
                 border-radius: 5px;
                 margin-top: 10px;
-            }
+              }
             </style>
-        </head>
-        <body>
-
+          </head>
+          <body>
             <div class="container">
-                <div class="header">
-                    Report Successfully Uploaded
-                </div>
-                <div class="content">
-                    <p>Dear <strong>${username}</strong>,</p>
-                    <p>Your report titled <strong>${title}</strong> has been successfully uploaded and published under PR Number.</p>
-                    <p>You can check the details of your report in your dashboard.</p>
-                    <p>Additionally, you can download the published report in the following formats:</p>
-                    <p>
-                        <a href="${pdfFtpPath.replace(
-        "/public_html/files",
-        ""
-      )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
-                        <a href="${excelFtpPath.replace(
-        "/public_html/files",
-        ""
-      )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
-                    </p>
-                    <p>If you have any questions, feel free to contact our support team.</p>
-                    <p>Best Regards,</p>
-                    <p><strong>IMCWire Team</strong></p>
-                </div>
-                <div class="footer">
-                    &copy; 2025 IMCWire. All rights reserved.
-                </div>
+              <div class="header">
+                Report Successfully Uploaded
+              </div>
+              <div class="content">
+                <p>Dear <strong>${username}</strong>,</p>
+                <p>Your report titled <strong>${title}</strong> has been successfully uploaded and published under PR Number ${pr_id}.</p>
+                <p>You can check the details of your report in your dashboard.</p>
+                <p>Additionally, you can download the published report in the following formats:</p>
+                <p>
+                  ${pdfFtpPath ? `<a href="${pdfFtpPath.replace("/public_html/files", "")}" class="button">Download PDF</a>` : ""}
+                  ${excelFtpPath ? `<a href="${excelFtpPath.replace("/public_html/files", "")}" class="button">Download Excel</a>` : ""}
+                </p>
+                <p>If you have any questions, feel free to contact our support team.</p>
+                <p>Best Regards,</p>
+                <p><strong>IMCWire Team</strong></p>
+              </div>
+              <div class="footer">
+                &copy; 2025 IMCWire. All rights reserved.
+              </div>
             </div>
-            </body>
-            </html>
-
+          </body>
+        </html>
       `,
     };
+
     await transporter.sendMail(reportMailOptions);
     await dbConnection.commit();
 
@@ -298,6 +553,7 @@ exports.createFullReport = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
+
 
 // ✅ Update Report and Files
 exports.updateFullReport = async (req, res) => {
