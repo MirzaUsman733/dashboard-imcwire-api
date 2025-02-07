@@ -375,7 +375,7 @@ exports.getUserPRs = async (req, res) => {
          WHERE ptc.pr_id = ?`,
         [pr.id]
       );
-    
+
       const [industryCategories] = await connection.query(
         `SELECT ic.id, ic.categoryName, ic.categoryPrice
          FROM pr_industry_categories pic
@@ -383,17 +383,17 @@ exports.getUserPRs = async (req, res) => {
          WHERE pic.pr_id = ?`,
         [pr.id]
       );
-    
+
       const [planRecords] = await connection.query(
         `SELECT * FROM plan_records WHERE pr_id = ?`,
         [pr.id]
       );
-    
+
       // Always assign these regardless of singlePRDetails existence
       pr.targetCountries = targetCountries.length ? targetCountries : null;
       pr.industryCategories = industryCategories.length ? industryCategories : null;
       pr.planRecords = planRecords.length ? planRecords : null;
-    
+
       // Fetch single PR details
       const [singlePRDetails] = await connection.query(
         `SELECT spd.*, r.id AS report_id, r.title AS report_title,
@@ -406,7 +406,7 @@ exports.getUserPRs = async (req, res) => {
          WHERE spd.pr_id = ?`,
         [pr.id]
       );
-    
+
       for (let spd of singlePRDetails) {
         const promises = [
           connection.query(`SELECT c.* FROM companies c WHERE c.id = ?`, [
@@ -414,9 +414,9 @@ exports.getUserPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -427,31 +427,31 @@ exports.getUserPRs = async (req, res) => {
             [spd.id]
           ),
         ];
-    
+
         const [company, pdfFile, tagsUrls] = await Promise.all(promises);
         spd.company = company.length ? company[0] : null;
         spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         spd.reports = spd.report_id
           ? {
-              id: spd.report_id,
-              title: spd.report_title,
-              excelFile: spd.excel_name
-                ? {
-                    name: spd.excel_name,
-                    url: spd.excel_url,
-                  }
-                : null,
-              pdfFile: spd.pdf_name
-                ? {
-                    name: spd.pdf_name,
-                    url: spd.pdf_url,
-                  }
-                : null,
-            }
+            id: spd.report_id,
+            title: spd.report_title,
+            excelFile: spd.excel_name
+              ? {
+                name: spd.excel_name,
+                url: spd.excel_url,
+              }
+              : null,
+            pdfFile: spd.pdf_name
+              ? {
+                name: spd.pdf_name,
+                url: spd.pdf_url,
+              }
+              : null,
+          }
           : null;
       }
-    
+
       pr.singlePRDetails = singlePRDetails;
     }
 
@@ -510,7 +510,7 @@ exports.getAllPRs = async (req, res) => {
          WHERE ptc.pr_id = ?`,
         [pr.id]
       );
-    
+
       const [industryCategories] = await connection.query(
         `SELECT ic.id, ic.categoryName, ic.categoryPrice
          FROM pr_industry_categories pic
@@ -518,17 +518,17 @@ exports.getAllPRs = async (req, res) => {
          WHERE pic.pr_id = ?`,
         [pr.id]
       );
-    
+
       const [planRecords] = await connection.query(
         `SELECT * FROM plan_records WHERE pr_id = ?`,
         [pr.id]
       );
-    
+
       // Always assign these regardless of singlePRDetails existence
       pr.targetCountries = targetCountries.length ? targetCountries : null;
       pr.industryCategories = industryCategories.length ? industryCategories : null;
       pr.planRecords = planRecords.length ? planRecords : null;
-    
+
       // Fetch single PR details
       const [singlePRDetails] = await connection.query(
         `SELECT spd.*, r.id AS report_id, r.title AS report_title,
@@ -541,7 +541,7 @@ exports.getAllPRs = async (req, res) => {
          WHERE spd.pr_id = ?`,
         [pr.id]
       );
-    
+
       for (let spd of singlePRDetails) {
         const promises = [
           connection.query(`SELECT c.* FROM companies c WHERE c.id = ?`, [
@@ -549,9 +549,9 @@ exports.getAllPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -562,34 +562,34 @@ exports.getAllPRs = async (req, res) => {
             [spd.id]
           ),
         ];
-    
+
         const [company, pdfFile, tagsUrls] = await Promise.all(promises);
         spd.company = company.length ? company[0] : null;
         spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         spd.reports = spd.report_id
           ? {
-              id: spd.report_id,
-              title: spd.report_title,
-              excelFile: spd.excel_name
-                ? {
-                    name: spd.excel_name,
-                    url: spd.excel_url,
-                  }
-                : null,
-              pdfFile: spd.pdf_name
-                ? {
-                    name: spd.pdf_name,
-                    url: spd.pdf_url,
-                  }
-                : null,
-            }
+            id: spd.report_id,
+            title: spd.report_title,
+            excelFile: spd.excel_name
+              ? {
+                name: spd.excel_name,
+                url: spd.excel_url,
+              }
+              : null,
+            pdfFile: spd.pdf_name
+              ? {
+                name: spd.pdf_name,
+                url: spd.pdf_url,
+              }
+              : null,
+          }
           : null;
       }
-    
+
       pr.singlePRDetails = singlePRDetails;
     }
-    
+
     res.status(200).json(prData);
   } catch (error) {
     console.error("Error fetching PRs:", error);
