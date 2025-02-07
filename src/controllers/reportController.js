@@ -159,7 +159,7 @@ exports.createFullReport = async (req, res) => {
         [
           reportId,
           prPdfId,
-          pdfFileName,
+          sanitizedPdfName,
           pdfFtpPath.replace("/public_html/files", ""),
         ]
       );
@@ -184,7 +184,7 @@ exports.createFullReport = async (req, res) => {
         "INSERT INTO report_excel_files (report_id, excel_name, excel_url) VALUES (?, ?, ?)",
         [
           reportId,
-          excelFileName,
+          sanitizedExcelName,
           excelFtpPath.replace("/public_html/files", ""),
         ]
       );
@@ -263,13 +263,13 @@ exports.createFullReport = async (req, res) => {
                     <p>Additionally, you can download the published report in the following formats:</p>
                     <p>
                         <a href="${pdfFtpPath.replace(
-                          "/public_html/files",
-                          ""
-                        )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+        "/public_html/files",
+        ""
+      )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
                         <a href="${excelFtpPath.replace(
-                          "/public_html/files",
-                          ""
-                        )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
+        "/public_html/files",
+        ""
+      )}" style="display: inline-block; background: #004085; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download PDF</a> 
                     </p>
                     <p>If you have any questions, feel free to contact our support team.</p>
                     <p>Best Regards,</p>
