@@ -295,7 +295,7 @@ exports.getUserPRs = async (req, res) => {
     // Fetch PR Data along with user and plan item data for the logged-in user
     const [prData] = await connection.query(
       `
-      SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, pi.numberOfPR, pi.perma
+      SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.type, pi.pdfLink, pi.numberOfPR, pi.perma
        FROM pr_data pr
       JOIN auth_user au ON pr.user_id = au.auth_user_id
       JOIN plan_items pi ON pr.plan_id = pi.id
@@ -337,8 +337,16 @@ exports.getUserPRs = async (req, res) => {
       );
 
       // Fetch Single PR Details
+      // Fetch Single PR Details
       const [singlePRDetails] = await connection.query(
-        `SELECT * FROM single_pr_details WHERE pr_id = ?`,
+        `SELECT spd.*, r.id AS report_id, r.title AS report_title,
+                ref.excel_name, ref.excel_url,
+                pdf.pdf_name AS pdf_name, pdf.pdf_url AS pdf_url
+         FROM single_pr_details spd
+         LEFT JOIN reports r ON spd.id = r.single_pr_id
+         LEFT JOIN report_excel_files ref ON r.id = ref.report_id
+         LEFT JOIN report_pr_pdfs pdf ON r.id = pdf.report_id
+         WHERE spd.pr_id = ?`,
         [pr.id]
       );
 
@@ -364,19 +372,33 @@ exports.getUserPRs = async (req, res) => {
         ];
 
         const [company, pdfFile, tagsUrls] = await Promise.all(promises);
-        pr.targetCountries = targetCountries.length ? targetCountries : [];
+        pr.targetCountries = targetCountries.length ? targetCountries : null;
         pr.industryCategories = industryCategories.length
           ? industryCategories
-          : [];
-        pr.planRecords = planRecords.length ? planRecords : [];
+          : null;
+        pr.planRecords = planRecords.length ? planRecords : null;
         spd.company = company.length ? company[0] : null;
         spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
-        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : [];
+        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
+        // Filter out null values in case no report data exists
+        spd.reports = spd.report_id ? {
+          id: spd.report_id,
+          title: spd.report_title,
+          excelFile: spd.excel_name ? {
+            name: spd.excel_name,
+            url: spd.excel_url
+          } : null,
+          pdfFile: spd.pdf_name ? {
+            name: spd.pdf_name,
+            url: spd.pdf_url
+          } : null
+        } : null;
       }
 
       // Add Single PR Details to PR Object
       pr.singlePRDetails = singlePRDetails;
     }
+
 
     res.status(200).json(prData);
   } catch (error) {
@@ -480,7 +502,7 @@ exports.getAllPRs = async (req, res) => {
   try {
     // Fetch all PR Data along with user and plan item data
     const [prData] = await connection.query(
-      `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at
+      `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.type, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at
        FROM pr_data pr
        JOIN auth_user au ON pr.user_id = au.auth_user_id
        JOIN plan_items pi ON pr.plan_id = pi.id
@@ -518,8 +540,16 @@ exports.getAllPRs = async (req, res) => {
       );
 
       // Fetch Single PR Details
+      // Fetch Single PR Details
       const [singlePRDetails] = await connection.query(
-        `SELECT * FROM single_pr_details WHERE pr_id = ?`,
+        `SELECT spd.*, r.id AS report_id, r.title AS report_title,
+                ref.excel_name, ref.excel_url,
+                pdf.pdf_name AS pdf_name, pdf.pdf_url AS pdf_url
+         FROM single_pr_details spd
+         LEFT JOIN reports r ON spd.id = r.single_pr_id
+         LEFT JOIN report_excel_files ref ON r.id = ref.report_id
+         LEFT JOIN report_pr_pdfs pdf ON r.id = pdf.report_id
+         WHERE spd.pr_id = ?`,
         [pr.id]
       );
 
@@ -545,14 +575,27 @@ exports.getAllPRs = async (req, res) => {
         ];
 
         const [company, pdfFile, tagsUrls] = await Promise.all(promises);
-        pr.targetCountries = targetCountries.length ? targetCountries : [];
+        pr.targetCountries = targetCountries.length ? targetCountries : null;
         pr.industryCategories = industryCategories.length
           ? industryCategories
-          : [];
-        pr.planRecords = planRecords.length ? planRecords : [];
+          : null;
+        pr.planRecords = planRecords.length ? planRecords : null;
         spd.company = company.length ? company[0] : null;
         spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
-        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : [];
+        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
+        // Filter out null values in case no report data exists
+        spd.reports = spd.report_id ? {
+          id: spd.report_id,
+          title: spd.report_title,
+          excelFile: spd.excel_name ? {
+            name: spd.excel_name,
+            url: spd.excel_url
+          } : null,
+          pdfFile: spd.pdf_name ? {
+            name: spd.pdf_name,
+            url: spd.pdf_url
+          } : null
+        } : null;
       }
 
       // Add Single PR Details to PR Object
@@ -632,9 +675,13 @@ exports.getUserPRsById = async (req, res) => {
 
     // ✅ Fetch PR Data for the logged-in user
     const [prData] = await connection.query(
-      "SELECT * FROM pr_data WHERE user_id = ? ORDER BY created_at DESC",
-      [userId]
+      `SELECT pr.*, au.email, pi.planName, pi.totalPlanPrice, pi.priceSingle, pi.planDescription, pi.pdfLink, pi.numberOfPR, pi.created_at AS plan_created_at, pi.updated_at AS plan_updated_at
+       FROM pr_data pr
+       JOIN auth_user au ON pr.user_id = au.auth_user_id
+       JOIN plan_items pi ON pr.plan_id = pi.id
+       ORDER BY pr.created_at DESC`
     );
+
 
     if (prData.length === 0) {
       return res.status(404).json({ message: "No PRs found for this user" });
@@ -645,28 +692,91 @@ exports.getUserPRsById = async (req, res) => {
       // Fetch Target Countries & Translations for PR
       const [targetCountries] = await connection.query(
         `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
-           FROM pr_target_countries ptc
-           JOIN target_countries tc ON ptc.target_country_id = tc.id
-           LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
-           WHERE ptc.pr_id = ?`,
+               FROM pr_target_countries ptc
+               JOIN target_countries tc ON ptc.target_country_id = tc.id
+               LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
+               WHERE ptc.pr_id = ?`,
         [pr.id]
       );
 
       // Fetch Industry Categories for PR
       const [industryCategories] = await connection.query(
         `SELECT ic.id, ic.categoryName, ic.categoryPrice
-           FROM pr_industry_categories pic
-           JOIN industry_categories ic ON pic.target_industry_id = ic.id
-           WHERE pic.pr_id = ?`,
+               FROM pr_industry_categories pic
+               JOIN industry_categories ic ON pic.target_industry_id = ic.id
+               WHERE pic.pr_id = ?`,
         [pr.id]
       );
 
-      // Add Related Data to PR Object
-      pr.targetCountries = targetCountries.length ? targetCountries : [];
-      pr.industryCategories = industryCategories.length
-        ? industryCategories
-        : [];
+      // Fetch Plan Record Data
+      const [planRecords] = await connection.query(
+        `SELECT * FROM plan_records WHERE pr_id = ?`,
+        [pr.id]
+      );
+
+      // Fetch Single PR Details
+      // Fetch Single PR Details
+      const [singlePRDetails] = await connection.query(
+        `SELECT spd.*, r.id AS report_id, r.title AS report_title,
+                ref.excel_name, ref.excel_url,
+                pdf.pdf_name AS pdf_name, pdf.pdf_url AS pdf_url
+         FROM single_pr_details spd
+         LEFT JOIN reports r ON spd.id = r.single_pr_id
+         LEFT JOIN report_excel_files ref ON r.id = ref.report_id
+         LEFT JOIN report_pr_pdfs pdf ON r.id = pdf.report_id
+         WHERE spd.pr_id = ?`,
+        [pr.id]
+      );
+
+      for (let spd of singlePRDetails) {
+        const promises = [
+          connection.query(`SELECT c.* FROM companies c WHERE c.id = ?`, [
+            spd.company_id,
+          ]),
+          spd.pdf_id
+            ? connection.query(
+                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+                [spd.pdf_id]
+              )
+            : Promise.resolve([[]]),
+          connection.query(
+            `SELECT t.*, ut.url
+             FROM single_pr_tags spt
+             JOIN tags t ON spt.tag_id = t.id
+             JOIN pr_url_tags ut ON spt.single_pr_id = ut.single_pr_id
+             WHERE spt.single_pr_id = ?`,
+            [spd.id]
+          ),
+        ];
+
+        const [company, pdfFile, tagsUrls] = await Promise.all(promises);
+        pr.targetCountries = targetCountries.length ? targetCountries : null;
+        pr.industryCategories = industryCategories.length
+          ? industryCategories
+          : null;
+        pr.planRecords = planRecords.length ? planRecords : null;
+        spd.company = company.length ? company[0] : null;
+        spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
+        spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
+        // Filter out null values in case no report data exists
+        spd.reports = spd.report_id ? {
+          id: spd.report_id,
+          title: spd.report_title,
+          excelFile: spd.excel_name ? {
+            name: spd.excel_name,
+            url: spd.excel_url
+          } : null,
+          pdfFile: spd.pdf_name ? {
+            name: spd.pdf_name,
+            url: spd.pdf_url
+          } : null
+        } : null;
+      }
+
+      // Add Single PR Details to PR Object
+      pr.singlePRDetails = singlePRDetails;
     }
+
 
     res.status(200).json(prData);
   } catch (error) {
