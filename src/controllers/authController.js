@@ -374,7 +374,6 @@ exports.superadminUpdateUser = async (req, res) => {
 
 </body>
 </html>
-
             `,
           };
           break;
