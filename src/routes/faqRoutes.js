@@ -3,25 +3,26 @@ const router = express.Router();
 const faqController = require("../controllers/faqController");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 
 router.get("/list", apiKeyMiddleware, faqController.getAllFaqs);
 // router.get("/:id", apiKeyMiddleware, faqController.getFaqById);
 router.post(
   "/add",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   faqController.createFaq
 );
 router.put(
   "/update/:id",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   faqController.updateFaq
 );
 router.delete(
   "/delete/:id",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   faqController.deleteFaq
 );
 

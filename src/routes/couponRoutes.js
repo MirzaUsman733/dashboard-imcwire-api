@@ -4,20 +4,21 @@ const couponController = require("../controllers/couponController");
 const authMiddleware = require("../middleware/authMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 
 // Routes (Only Admins Can Manage Coupons)
 router.post(
   "/add",
   authMiddleware,
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   couponController.createCoupon
 );
 router.put(
   "/update",
   authMiddleware,
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   couponController.updateCoupon
 );
 router.put(
@@ -33,7 +34,7 @@ router.get(
   "/admin-list",
   authMiddleware,
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   couponController.getAllCoupons
 );
 router.get("/validate", apiKeyMiddleware, couponController.validateCoupon);
@@ -41,7 +42,7 @@ router.delete(
   "/delete",
   authMiddleware,
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   couponController.deleteCoupon
 );
 

@@ -5,6 +5,7 @@ const { body } = require("express-validator");
 const authMiddleware = require("../middleware/authMiddleware");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 
 router.post(
   "/register",
@@ -60,12 +61,12 @@ router.get("/profile/get", authMiddleware, authController.getUserProfile);
 
 router.put(
   "/superadmin-update",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   authController.superadminUpdateUser
 );
 router.get(
   "/superadmin-list",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   authController.getAllUsers
 );
 

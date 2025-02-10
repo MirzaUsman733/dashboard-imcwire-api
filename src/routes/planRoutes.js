@@ -3,25 +3,26 @@ const router = express.Router();
 const planController = require("../controllers/planController");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 
 // Admin-only routes
 router.post(
   "/add",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   planController.createPlan
 );
 
 router.put(
   "/update/:perma",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   planController.updatePlan
 );
 
 router.delete(
   "/delete",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   planController.deletePlan
 );

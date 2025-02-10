@@ -4,11 +4,12 @@ const reportController = require("../controllers/reportController");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 // ✅ Create Report + Upload PDF & Excel in One API
 router.post(
   "/createFullReport",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   reportController.uploadMiddleware,
   reportController.createFullReport
 );
@@ -17,7 +18,7 @@ router.post(
 router.put(
   "/updateFullReport",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   reportController.uploadMiddleware,
   reportController.updateFullReport
 );

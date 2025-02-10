@@ -4,6 +4,7 @@ const companyController = require("../controllers/companyController");
 const authMiddleware = require("../middleware/authMiddleware");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 
 // Routes (Only Authenticated Users)
 router.post(
@@ -52,21 +53,21 @@ router.delete(
 router.get(
   "/superadmin/all",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   companyController.getAllCompanies
 );
 
 router.get(
   "/superadmin/user",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   companyController.getCompaniesByUserId
 );
 
 router.get(
   "/superadmin/detail",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   companyController.getCompanyDetailsById
 );
 

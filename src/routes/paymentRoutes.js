@@ -5,6 +5,7 @@ const orderController = require("../controllers/orderController");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
+const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
 
 // Route to create an order
 router.post("/stripe-checkout", paymentController.handleStripePayment);
@@ -22,7 +23,7 @@ router.get(
 router.get(
   "/all",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   paymentController.getAllPaymentHistories
 );
 
@@ -36,7 +37,7 @@ router.get(
 
 router.post(
   "/add",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   paymentController.addCustomPayment
 );
 module.exports = router;

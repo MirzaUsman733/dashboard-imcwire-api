@@ -79,21 +79,21 @@ router.get(
 router.get(
   "/user-order/:userId",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prOrderDataController.getUserPRsById
 );
 
 router.get(
   "/superadmin-list",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prOrderDataController.getAllPRs
 );
 
 router.put(
   "/superadmin/update-order-status/:prId",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prOrderDataController.updatePROrderStatusBySuperAdmin
 );
 
@@ -143,7 +143,7 @@ router.get(
 router.get(
   "/get-single-pr/superadmin/statuses",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prController.getAllPRStatusCounts
 );
 
@@ -156,35 +156,35 @@ router.get(
 router.get(
   "/superadmin/single-pr-list",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prController.getAllSinglePRs
 );
 
 router.get(
   "/superadmin/single-pr-list/user/:user_id",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prController.getSinglePRsByUser
 );
 
 router.get(
   "/superadmin/single-pr-list/pr-data/:pr_id",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prController.getSinglePRsByPRData
 );
 
 router.get(
   "/superadmin/single-pr-details/:single_pr_id",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prController.getSinglePRDetails
 );
 
 router.put(
   "/superadmin/update-single-pr/:single_pr_id",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prController.updatePRStatusBySuperAdmin
 );
 
