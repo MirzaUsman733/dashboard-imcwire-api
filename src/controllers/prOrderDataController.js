@@ -782,7 +782,7 @@ exports.submitCustomOrder = async (req, res) => {
     planDescription,
     pdfLink,
     numberOfPR,
-    activate_plan = 0, // Default to inactive
+    activate_plan = 0,
     type,
     orderType,
     targetCountries,
@@ -790,7 +790,11 @@ exports.submitCustomOrder = async (req, res) => {
     total_price,
     payment_status,
     payment_method,
-    is_active = 0, // Default to inactive
+    is_active = 0,
+    prType, // Added prType
+    discountType, // "percentage" or "dollar"
+    discountValue, // Numeric value
+    discountAmount, // Calculated discount amount
   } = req.body;
 
   // Validate Required Fields
@@ -805,7 +809,11 @@ exports.submitCustomOrder = async (req, res) => {
     !targetCountries.length ||
     !industryCategories.length ||
     !total_price ||
-    !payment_status
+    !payment_status ||
+    !prType ||
+    !discountType || // Ensure discountType is provided
+    discountValue === undefined || // Ensure discountValue is provided
+    discountAmount === undefined // Ensure discountAmount is provided
   ) {
     return res.status(400).json({ message: "Missing required fields" });
   }
@@ -813,7 +821,7 @@ exports.submitCustomOrder = async (req, res) => {
   let dbConnection;
   try {
     dbConnection = await connection.getConnection();
-    await dbConnection.beginTransaction(); // Begin Transaction
+    await dbConnection.beginTransaction();
 
     // 1. Insert Plan into `plan_items` if it doesn't exist
     let plan_id;
@@ -823,10 +831,8 @@ exports.submitCustomOrder = async (req, res) => {
     );
 
     if (existingPlan.length > 0) {
-      // Plan already exists, use the existing ID
       plan_id = existingPlan[0].id;
     } else {
-      // Insert new plan
       const [planResult] = await dbConnection.query(
         `INSERT INTO plan_items 
         (planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type) 
@@ -843,18 +849,18 @@ exports.submitCustomOrder = async (req, res) => {
           type,
         ]
       );
-      plan_id = planResult.insertId; // Get newly inserted plan ID
+      plan_id = planResult.insertId;
     }
 
     // 2. Generate unique orderId and client_id
     const orderId = uuidv4();
     const client_id = uuidv4();
 
-    // 3. Store Custom Order
+    // 3. Store Custom Order with prType and Discounts
     const [orderResult] = await dbConnection.query(
       `INSERT INTO custom_orders 
-      (orderId, client_id, plan_id, perma, orderType, total_price, payment_status, payment_method, is_active, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      (orderId, client_id, plan_id, perma, orderType, total_price, payment_status, payment_method, is_active, prType, discountType, discountValue, discountAmount, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         orderId,
         client_id,
@@ -865,6 +871,10 @@ exports.submitCustomOrder = async (req, res) => {
         payment_status,
         payment_method,
         is_active ? 1 : 0,
+        prType,
+        discountType,
+        discountValue,
+        discountAmount,
       ]
     );
     const customOrderId = orderResult.insertId;
@@ -874,15 +884,10 @@ exports.submitCustomOrder = async (req, res) => {
     for (const country of targetCountries) {
       let translationId = null;
       if (country.translationRequired) {
-        // const [translationResult] = await dbConnection.query(
-        //   "INSERT INTO translation_required (translation) VALUES (?)",
-        //   [country.translationRequired]
-        // );
         const [translationResult] = await dbConnection.query(
           "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
           [country.translationRequired, country.translationPrice]
         );
-
         translationId = translationResult.insertId;
       }
 
@@ -919,7 +924,7 @@ exports.submitCustomOrder = async (req, res) => {
       );
     }
 
-    // 8. Generate Invoice URL using the provided perma
+    // 8. Generate Invoice URL
     const invoiceUrl = `https://dashboard.imcwire.com/custom-invoice/${perma}`;
 
     await dbConnection.commit();
@@ -938,6 +943,8 @@ exports.submitCustomOrder = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
+
+
 
 // exports.getCustomOrder = async (req, res) => {
 //   const { orderId } = req.params;

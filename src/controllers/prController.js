@@ -600,10 +600,10 @@ exports.getUserPRStatusCounts = async (req, res) => {
 
     // ✅ Format response
     const statusSummary = {
-      "Not Started": 0,
+      NotStarted: 0,
       Pending: 0,
       Approved: 0,
-      "In Progress": 0,
+      InProgress: 0,
       Published: 0,
     };
 
@@ -643,10 +643,10 @@ exports.getAllPRStatusCounts = async (req, res) => {
 
     // ✅ Format response
     const statusSummary = {
-      "Not Started": 0,
+      NotStarted: 0,
       Pending: 0,
       Approved: 0,
-      "In Progress": 0,
+      InProgress: 0,
       Published: 0,
     };
 
