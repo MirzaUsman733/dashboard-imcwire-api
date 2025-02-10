@@ -1139,10 +1139,10 @@ exports.getCustomOrder = async (req, res) => {
       targetCountries,
       industryCategories,
       planData: planData,
-      prType: order.prType, // ✅ Added prType
-      discountType: order.discountType, // ✅ Added discountType
-      discountValue: order.discountValue, // ✅ Added discountValue
-      discountAmount: order.discountAmount
+      prType: customOrder.prType, // ✅ Added prType
+      discountType: customOrder.discountType, // ✅ Added discountType
+      discountValue: customOrder.discountValue, // ✅ Added discountValue
+      discountAmount: customOrder.discountAmount
         ? {
           plan_id: planData.id,
           planName: planData.planName,
