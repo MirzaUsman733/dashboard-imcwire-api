@@ -607,11 +607,20 @@ exports.getUserPRStatusCounts = async (req, res) => {
       Published: 0,
     };
 
-    // ✅ Populate counts dynamically
+    // ✅ Normalize and Populate counts dynamically
     statusCounts.forEach((row) => {
-      statusSummary[row.status] = row.count;
-    });
+      let normalizedStatus = row.status;
 
+      if (normalizedStatus === "Not Started") {
+        normalizedStatus = "NotStarted";
+      } else if (normalizedStatus === "In Progress") {
+        normalizedStatus = "InProgress";
+      }
+
+      if (statusSummary.hasOwnProperty(normalizedStatus)) {
+        statusSummary[normalizedStatus] += row.count;
+      }
+    });
     res.status(200).json({
       message: "PR status counts retrieved successfully.",
       data: statusSummary,
@@ -650,9 +659,19 @@ exports.getAllPRStatusCounts = async (req, res) => {
       Published: 0,
     };
 
-    // ✅ Populate counts dynamically
+    // ✅ Normalize and Populate counts dynamically
     statusCounts.forEach((row) => {
-      statusSummary[row.status] = row.count;
+      let normalizedStatus = row.status;
+
+      if (normalizedStatus === "Not Started") {
+        normalizedStatus = "NotStarted";
+      } else if (normalizedStatus === "In Progress") {
+        normalizedStatus = "InProgress";
+      }
+
+      if (statusSummary.hasOwnProperty(normalizedStatus)) {
+        statusSummary[normalizedStatus] += row.count;
+      }
     });
 
     res.status(200).json({

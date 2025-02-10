@@ -1138,7 +1138,11 @@ exports.getCustomOrder = async (req, res) => {
       created_at: customOrder.created_at,
       targetCountries,
       industryCategories,
-      planData: planData
+      planData: planData,
+      prType: order.prType, // ✅ Added prType
+      discountType: order.discountType, // ✅ Added discountType
+      discountValue: order.discountValue, // ✅ Added discountValue
+      discountAmount: order.discountAmount
         ? {
           plan_id: planData.id,
           planName: planData.planName,
@@ -1212,6 +1216,10 @@ exports.getAllCustomOrders = async (req, res) => {
         payment_status: order.payment_status,
         payment_method: order.payment_method,
         is_active: order.is_active,
+        prType: order.prType, // ✅ Added prType
+        discountType: order.discountType, // ✅ Added discountType
+        discountValue: order.discountValue, // ✅ Added discountValue
+        discountAmount: order.discountAmount, // ✅ Added discountAmount
         created_at: order.created_at,
         invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${order.perma}`,
         plan: order.planName
