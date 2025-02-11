@@ -215,14 +215,23 @@ exports.deleteCompany = async (req, res) => {
 exports.getAllCompanies = async (req, res) => {
   try {
     const [companies] = await connection.query(
-      "SELECT * FROM companies ORDER BY created_at DESC"
+      `SELECT 
+          c.*, 
+          u.email AS user_email,  -- ✅ Renamed to user_email 
+          c.email AS company_email -- ✅ Renamed to company_email
+       FROM companies AS c 
+       INNER JOIN auth_user AS u ON c.user_id = u.auth_user_id 
+       ORDER BY c.created_at DESC`
     );
 
     res.status(200).json(companies);
   } catch (error) {
+    console.error(error); // Log error for debugging
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
 
 // ✅ **Super Admin: Get company details by company ID**
 exports.getCompanyDetailsById = async (req, res) => {
