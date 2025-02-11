@@ -6,9 +6,11 @@ const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 const crypto = require("crypto");
 const { transporter } = require("../config/transporter");
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
+require('dotenv').config();
 
 // Helper functions for AES encryption and decryption
 function encryptPassword(password) {
+  console.log(password)
   if (!password) {
     throw new Error("Password is required for encryption");
   }
@@ -350,6 +352,8 @@ exports.submitPR = async (req, res) => {
 };
 
 // Helper function to generate a strong password of given length
+
+// Helper function to generate a strong password of a given length.
 function generateStrongPassword(length) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?";
   let password = "";
@@ -359,16 +363,19 @@ function generateStrongPassword(length) {
   return password;
 }
 
+
+// Main function that handles adding a user PR order.
 exports.addUserPrOrder = async (req, res) => {
   let dbConnection;
   try {
+    // Get a database connection and start a transaction.
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction();
 
     // ─── EXTRACT DATA FROM THE REQUEST BODY ──────────────────────────────
     // User details
     const { username, email, password, role, isAgency } = req.body;
-    // Plan details: either an existing plan_id is provided or plan details are provided.
+    // Plan details (either an existing plan_id or new plan details)
     let {
       plan_id,
       planName,
@@ -389,20 +396,17 @@ exports.addUserPrOrder = async (req, res) => {
     const { transactionId, amountPaid, currency, receiptEmail } = req.body;
 
     // ─── VALIDATIONS ──────────────────────────────────────────────────────
-    // Validate required user fields (username and email are required; password is optional for new user creation)
     if (!username || !email) {
       return res.status(400).json({
         message: "Missing required user fields: username and email",
       });
     }
-    // Validate required PR order fields
     if (!prType || !pr_status || !total_price || !payment_status || !ip_address) {
       return res.status(400).json({
         message:
           "Missing required PR order fields: prType, pr_status, total_price, payment_status, ip_address",
       });
     }
-    // Validate that targetCountries and industryCategories are provided as non-empty arrays
     if (!targetCountries || !Array.isArray(targetCountries) || targetCountries.length === 0) {
       return res.status(400).json({
         message: "targetCountries is required and should be a non-empty array",
@@ -414,7 +418,6 @@ exports.addUserPrOrder = async (req, res) => {
       });
     }
 
-    // Validate each target country object
     const targetCountryErrors = [];
     targetCountries.forEach((country, index) => {
       if (!country.name) {
@@ -432,7 +435,6 @@ exports.addUserPrOrder = async (req, res) => {
       }
     });
 
-    // Validate each industry category object
     const industryCategoryErrors = [];
     industryCategories.forEach((category, index) => {
       if (!category.name) {
@@ -452,32 +454,33 @@ exports.addUserPrOrder = async (req, res) => {
     let user_id;
     let originalPasswordForEmail = "";
     let isNewUser = false;
+
     const [existingUser] = await dbConnection.query("SELECT * FROM auth_user WHERE email = ?", [email]);
 
     if (existingUser.length > 0) {
-      // User already exists—use the existing user record.
-      user_id = existingUser[0].auth_user_id; // Adjust if your primary key column differs.
+      user_id = existingUser[0].auth_user_id;
     } else {
       isNewUser = true;
-      // If no password is provided, generate a strong password automatically.
       let userPassword = password;
       if (!userPassword) {
         const randomLength = Math.floor(Math.random() * 7) + 8; // random length between 8 and 14
         userPassword = generateStrongPassword(randomLength);
       }
-      originalPasswordForEmail = userPassword; // Save the plaintext password for email notification.
+      originalPasswordForEmail = userPassword;
+
       const salt = await bcrypt.genSalt(10);
       const password_hash = await bcrypt.hash(userPassword, salt);
+      console.log(password_hash)
       const { encrypted, iv } = encryptPassword(userPassword);
       const [userInsertResult] = await dbConnection.query(
         "INSERT INTO auth_user (username, email, password, aes_password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [username, email, password_hash, `${encrypted}:${iv}`, role || "user", isAgency || false, "active"]
       );
+      console.log(userInsertResult)
       user_id = userInsertResult.insertId;
     }
 
     // ─── HANDLE PLAN DETAILS ────────────────────────────────────────────────
-    // If plan_id is not provided but plan details (like perma) are provided, then create a new plan.
     let finalPlanId = plan_id;
     if (!plan_id && perma) {
       const [existingPlan] = await dbConnection.query("SELECT id FROM plan_items WHERE perma = ?", [perma]);
@@ -495,7 +498,6 @@ exports.addUserPrOrder = async (req, res) => {
       await dbConnection.rollback();
       return res.status(400).json({ message: "A valid plan_id or plan details are required." });
     }
-    // Retrieve plan details from the database.
     const [planItem] = await dbConnection.query(
       "SELECT planName, numberOfPR, activate_plan FROM plan_items WHERE id = ?",
       [finalPlanId]
@@ -514,7 +516,7 @@ exports.addUserPrOrder = async (req, res) => {
     // ─── PREPARE TO INSERT THE PR ORDER ─────────────────────────────────────
     const client_id = uuidv4();
 
-    // ─── INSERT TARGET COUNTRIES AND INDUSTRY CATEGORIES ───────────────────
+    // ─── INSERT TARGET COUNTRIES ──────────────────────────────────────────
     let targetCountryIds = [];
     for (const country of targetCountries) {
       let translationId = null;
@@ -532,6 +534,7 @@ exports.addUserPrOrder = async (req, res) => {
       targetCountryIds.push(targetCountryResult.insertId);
     }
 
+    // ─── INSERT INDUSTRY CATEGORIES ─────────────────────────────────────────
     let industryCategoryIds = [];
     for (const category of industryCategories) {
       const [industryCategoryResult] = await dbConnection.query(
