@@ -1,8 +1,28 @@
 require("dotenv").config(); // This loads variables from a .env file
 const connection = require("../config/dbconfig");
+const bcrypt = require("bcryptjs");
 const { v4: uuidv4 } = require("uuid");
 const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
+const crypto = require("crypto");
+const { transporter } = require("../config/transporter");
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
+
+// Helper functions for AES encryption and decryption
+function encryptPassword(password) {
+  if (!password) {
+    throw new Error("Password is required for encryption");
+  }
+  const algorithm = "aes-128-cbc";
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, "salt", 16); // Ensure the key is 16 bytes for AES-128
+  const iv = crypto.randomBytes(16); // Initialization vector
+
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  let encrypted = cipher.update(password, "utf8", "hex");
+  encrypted += cipher.final("hex");
+
+  return { encrypted, iv: iv.toString("hex") };
+}
+
 
 exports.submitPR = async (req, res) => {
   const {
@@ -104,7 +124,7 @@ exports.submitPR = async (req, res) => {
 
     // 2. Check if the plan is activated
     const [planItem] = await dbConnection.query(
-      "SELECT numberOfPR, activate_plan FROM plan_items WHERE id = ?",
+      "SELECT numberOfPR, planName, activate_plan FROM plan_items WHERE id = ?",
       [plan_id]
     );
 
@@ -277,9 +297,45 @@ exports.submitPR = async (req, res) => {
       await dbConnection.rollback();
       return res.status(500).json({ message: "Payment Method is Incorrect" });
     }
-
+    const planNameForEmail = planItem[0].planName;
     // Commit the transaction if all operations succeeded
     await dbConnection.commit();
+     // Construct the email content with order details and the payment link
+     const emailHtml = `
+     <h2>Hello ${username},</h2>
+     <p>Your PR order has been successfully created. Below are your order details:</p>
+     <h3>Order Details</h3>
+     <ul>
+       <li><strong>Order ID:</strong> ${prId}</li>
+       <li><strong>Plan ID:</strong> ${planNameForEmail}</li>
+       <li><strong>Order Type:</strong> ${prType}</li>
+       <li><strong>Total Price:</strong> $${total_price}</li>
+       <li><strong>Payment Status:</strong> ${payment_status}</li>
+     </ul>
+     <p><strong>Payment Link:</strong></p>
+     <p><a href="${paymentUrl}">Click here to complete your payment</a></p>
+     <p>Please complete your payment using the above link. If you have any questions or require further assistance, feel free to contact our support team.</p>
+     <p>Thank you for choosing our service!</p>
+     <p>Best regards,<br>IMCWire Support Team</p>
+   `;
+
+   // Send the email
+   transporter.sendMail(
+     {
+       from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+       to: userEmail,
+       subject: "Your PR Order & Payment Details",
+       html: emailHtml,
+     },
+     (err, info) => {
+       if (err) {
+         console.error("Error sending email:", err);
+       } else {
+         console.log("Email sent:", info.response);
+       }
+     }
+   );
+
     return res.status(201).json({
       message: "We are redirecting you to the payment page.",
       paymentUrl,
@@ -293,6 +349,359 @@ exports.submitPR = async (req, res) => {
   }
 };
 
+// Helper function to generate a strong password of given length
+function generateStrongPassword(length) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+exports.addUserPrOrder = async (req, res) => {
+  let dbConnection;
+  try {
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction();
+
+    // ─── EXTRACT DATA FROM THE REQUEST BODY ──────────────────────────────
+    // User details
+    const { username, email, password, role, isAgency } = req.body;
+    // Plan details: either an existing plan_id is provided or plan details are provided.
+    let {
+      plan_id,
+      planName,
+      perma,
+      totalPlanPrice,
+      priceSingle,
+      planDescription,
+      pdfLink,
+      numberOfPR,
+      activate_plan,
+      type,
+    } = req.body;
+    // PR order details
+    const { prType, pr_status, total_price, payment_status, ip_address } = req.body;
+    // Arrays for target countries and industry categories
+    const { targetCountries, industryCategories } = req.body;
+    // Payment history details for manual payment
+    const { transactionId, amountPaid, currency, receiptEmail } = req.body;
+
+    // ─── VALIDATIONS ──────────────────────────────────────────────────────
+    // Validate required user fields (username and email are required; password is optional for new user creation)
+    if (!username || !email) {
+      return res.status(400).json({
+        message: "Missing required user fields: username and email",
+      });
+    }
+    // Validate required PR order fields
+    if (!prType || !pr_status || !total_price || !payment_status || !ip_address) {
+      return res.status(400).json({
+        message:
+          "Missing required PR order fields: prType, pr_status, total_price, payment_status, ip_address",
+      });
+    }
+    // Validate that targetCountries and industryCategories are provided as non-empty arrays
+    if (!targetCountries || !Array.isArray(targetCountries) || targetCountries.length === 0) {
+      return res.status(400).json({
+        message: "targetCountries is required and should be a non-empty array",
+      });
+    }
+    if (!industryCategories || !Array.isArray(industryCategories) || industryCategories.length === 0) {
+      return res.status(400).json({
+        message: "industryCategories is required and should be a non-empty array",
+      });
+    }
+
+    // Validate each target country object
+    const targetCountryErrors = [];
+    targetCountries.forEach((country, index) => {
+      if (!country.name) {
+        targetCountryErrors.push(`targetCountries[${index}].name is missing.`);
+      }
+      if (country.price === undefined || country.price === null) {
+        targetCountryErrors.push(`targetCountries[${index}].price is missing.`);
+      }
+      if (country.translationRequired) {
+        if (country.translationPrice === undefined || country.translationPrice === null) {
+          targetCountryErrors.push(
+            `targetCountries[${index}].translationPrice is missing while translationRequired is provided.`
+          );
+        }
+      }
+    });
+
+    // Validate each industry category object
+    const industryCategoryErrors = [];
+    industryCategories.forEach((category, index) => {
+      if (!category.name) {
+        industryCategoryErrors.push(`industryCategories[${index}].name is missing.`);
+      }
+      if (category.price === undefined || category.price === null) {
+        industryCategoryErrors.push(`industryCategories[${index}].price is missing.`);
+      }
+    });
+
+    if (targetCountryErrors.length > 0 || industryCategoryErrors.length > 0) {
+      const errors = [...targetCountryErrors, ...industryCategoryErrors].join(" ");
+      return res.status(400).json({ message: "Validation errors: " + errors });
+    }
+
+    // ─── CREATE OR GET THE USER ───────────────────────────────────────────
+    let user_id;
+    let originalPasswordForEmail = "";
+    let isNewUser = false;
+    const [existingUser] = await dbConnection.query("SELECT * FROM auth_user WHERE email = ?", [email]);
+
+    if (existingUser.length > 0) {
+      // User already exists—use the existing user record.
+      user_id = existingUser[0].auth_user_id; // Adjust if your primary key column differs.
+    } else {
+      isNewUser = true;
+      // If no password is provided, generate a strong password automatically.
+      let userPassword = password;
+      if (!userPassword) {
+        const randomLength = Math.floor(Math.random() * 7) + 8; // random length between 8 and 14
+        userPassword = generateStrongPassword(randomLength);
+      }
+      originalPasswordForEmail = userPassword; // Save the plaintext password for email notification.
+      const salt = await bcrypt.genSalt(10);
+      const password_hash = await bcrypt.hash(userPassword, salt);
+      const { encrypted, iv } = encryptPassword(userPassword);
+      const [userInsertResult] = await dbConnection.query(
+        "INSERT INTO auth_user (username, email, password, aes_password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [username, email, password_hash, `${encrypted}:${iv}`, role || "user", isAgency || false, "active"]
+      );
+      user_id = userInsertResult.insertId;
+    }
+
+    // ─── HANDLE PLAN DETAILS ────────────────────────────────────────────────
+    // If plan_id is not provided but plan details (like perma) are provided, then create a new plan.
+    let finalPlanId = plan_id;
+    if (!plan_id && perma) {
+      const [existingPlan] = await dbConnection.query("SELECT id FROM plan_items WHERE perma = ?", [perma]);
+      if (existingPlan.length > 0) {
+        await dbConnection.rollback();
+        return res.status(409).json({ message: "Perma already exists, choose a unique perma" });
+      }
+      const [planResult] = await dbConnection.query(
+        "INSERT INTO plan_items (planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type]
+      );
+      finalPlanId = planResult.insertId;
+    }
+    if (!finalPlanId) {
+      await dbConnection.rollback();
+      return res.status(400).json({ message: "A valid plan_id or plan details are required." });
+    }
+    // Retrieve plan details from the database.
+    const [planItem] = await dbConnection.query(
+      "SELECT planName, numberOfPR, activate_plan FROM plan_items WHERE id = ?",
+      [finalPlanId]
+    );
+    if (planItem.length === 0) {
+      await dbConnection.rollback();
+      return res.status(404).json({ message: "Plan details not found." });
+    }
+    if (planItem[0].activate_plan !== 1) {
+      await dbConnection.rollback();
+      return res.status(403).json({ message: "The selected plan is not activated yet." });
+    }
+    const planNameForEmail = planItem[0].planName;
+    const totalPrs = planItem[0].numberOfPR;
+
+    // ─── PREPARE TO INSERT THE PR ORDER ─────────────────────────────────────
+    const client_id = uuidv4();
+
+    // ─── INSERT TARGET COUNTRIES AND INDUSTRY CATEGORIES ───────────────────
+    let targetCountryIds = [];
+    for (const country of targetCountries) {
+      let translationId = null;
+      if (country.translationRequired) {
+        const [translationResult] = await dbConnection.query(
+          "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
+          [country.translationRequired, country.translationPrice]
+        );
+        translationId = translationResult.insertId;
+      }
+      const [targetCountryResult] = await dbConnection.query(
+        "INSERT INTO target_countries (countryName, countryPrice, translation_required_id) VALUES (?, ?, ?)",
+        [country.name, country.price, translationId]
+      );
+      targetCountryIds.push(targetCountryResult.insertId);
+    }
+
+    let industryCategoryIds = [];
+    for (const category of industryCategories) {
+      const [industryCategoryResult] = await dbConnection.query(
+        "INSERT INTO industry_categories (categoryName, categoryPrice) VALUES (?, ?)",
+        [category.name, category.price]
+      );
+      industryCategoryIds.push(industryCategoryResult.insertId);
+    }
+
+    // ─── INSERT THE PR ORDER (using manual payment) ─────────────────────────
+    const [prResult] = await dbConnection.query(
+      "INSERT INTO pr_data (client_id, user_id, plan_id, prType, pr_status, payment_method, total_price, payment_status, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [client_id, user_id, finalPlanId, prType, pr_status, "manual_payment", total_price, payment_status, ip_address]
+    );
+    const prId = prResult.insertId;
+
+    // Record the plan usage.
+    await dbConnection.query(
+      "INSERT INTO plan_records (user_id, plan_id, total_prs, used_prs, pr_id) VALUES (?, ?, ?, ?, ?)",
+      [user_id, finalPlanId, totalPrs, 0, prId]
+    );
+
+    // Link the PR order with its target countries.
+    for (const countryId of targetCountryIds) {
+      await dbConnection.query(
+        "INSERT INTO pr_target_countries (pr_id, target_country_id) VALUES (?, ?)",
+        [prId, countryId]
+      );
+    }
+    // Link the PR order with its industry categories.
+    for (const categoryId of industryCategoryIds) {
+      await dbConnection.query(
+        "INSERT INTO pr_industry_categories (pr_id, target_industry_id) VALUES (?, ?)",
+        [prId, categoryId]
+      );
+    }
+
+    // ─── RECORD THE MANUAL PAYMENT IN THE PAYMENT HISTORY ───────────────────
+    await dbConnection.query(
+      "INSERT INTO payment_history (pr_id, user_id, stripe_session_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [prId, user_id, "manual_payment", transactionId, amountPaid, currency, "paid", "manual_payment", receiptEmail]
+    );
+
+    // ─── COMMIT THE TRANSACTION ─────────────────────────────────────────────
+    await dbConnection.commit();
+
+    // ─── CONSTRUCT THE EMAIL CONTENT ─────────────────────────────────────────
+    const greeting = isNewUser ? "<h2>Welcome to IMCWire!</h2>" : "<h2>Hello!</h2>";
+    const accountInfo = isNewUser
+      ? `<p>Your account has been created with the following credentials:</p>
+         <ul>
+           <li><strong>Email:</strong> ${email}</li>
+           <li><strong>Password:</strong> ${originalPasswordForEmail}</li>
+         </ul>`
+      : `<p>Your account is already active. Please use your existing credentials to login.</p>`;
+
+    const mailOptions = {
+      from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Your Custom Order Details",
+      html: `
+        ${greeting}
+        <p>Dear ${username},</p>
+        <p>Thank you for choosing IMCWire. We are pleased to inform you that your custom PR order has been successfully processed.</p>
+        <h3>Order Details</h3>
+        <ul>
+          <li><strong>Order ID:</strong> ${prId}</li>
+          <li><strong>Plan Name:</strong> ${planNameForEmail}</li>
+          <li><strong>Total PRs in Plan:</strong> ${totalPrs}</li>
+          <li><strong>Order Type:</strong> ${prType}</li>
+          <li><strong>Total Price:</strong> ${total_price}</li>
+          <li><strong>Payment Status:</strong> ${payment_status}</li>
+        </ul>
+        ${accountInfo}
+        <p>If you have any questions or need further assistance, please feel free to contact our support team.</p>
+        <p>With best regards,<br>IMCWire Support Team</p>
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Error sending order email:", error);
+      } else {
+        console.log("Order email sent:", info.response);
+      }
+    });
+
+    return res.status(201).json({ message: "User PR order added successfully", prId });
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback();
+    console.error("Error in addUserPrOrder:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) await dbConnection.release();
+  }
+};
+
+
+// API for Super Admin to update only targetCountries and industryCategories
+exports.updatePRCountriesAndCategories = async (req, res) => {
+  const { pr_id } = req.params; // PR ID from URL
+  const { targetCountries, industryCategories } = req.body;
+  console.log(req)
+  if (!pr_id) {
+    return res.status(400).json({ message: "PR ID is required" });
+  }
+
+  let dbConnection;
+  try {
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction(); // Begin Transaction
+
+    // Fetch existing PR record
+    const [existingPR] = await dbConnection.query("SELECT id FROM pr_data WHERE id = ?", [pr_id]);
+    if (existingPR.length === 0) {
+      await dbConnection.rollback();
+      return res.status(404).json({ message: "PR not found" });
+    }
+
+    // Delete existing target country & category mappings before updating
+    await dbConnection.query("DELETE FROM pr_target_countries WHERE pr_id = ?", [pr_id]);
+    await dbConnection.query("DELETE FROM pr_industry_categories WHERE pr_id = ?", [pr_id]);
+
+    // Insert new Target Countries
+    for (const country of targetCountries) {
+      let translationId = null;
+      if (country.translationRequired) {
+        const [translationResult] = await dbConnection.query(
+          "INSERT INTO translation_required (translation, translationPrice) VALUES (?, ?)",
+          [country.translationRequired, country.translationPrice]
+        );
+        translationId = translationResult.insertId;
+      }
+
+      const [targetCountryResult] = await dbConnection.query(
+        "INSERT INTO target_countries (countryName, countryPrice, translation_required_id) VALUES (?, ?, ?)",
+        [country.name, country.price, translationId]
+      );
+
+      await dbConnection.query(
+        "INSERT INTO pr_target_countries (pr_id, target_country_id) VALUES (?, ?)",
+        [pr_id, targetCountryResult.insertId]
+      );
+    }
+
+    // Insert new Industry Categories
+    for (const category of industryCategories) {
+      const [industryCategoryResult] = await dbConnection.query(
+        "INSERT INTO industry_categories (categoryName, categoryPrice) VALUES (?, ?)",
+        [category.name, category.price]
+      );
+
+      await dbConnection.query(
+        "INSERT INTO pr_industry_categories (pr_id, target_industry_id) VALUES (?, ?)",
+        [pr_id, industryCategoryResult.insertId]
+      );
+    }
+
+    // Commit transaction
+    await dbConnection.commit();
+    return res.status(200).json({ message: "PR countries and categories updated successfully" });
+
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback();
+    console.error("Error in updatePRCountriesAndCategories:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    if (dbConnection) await dbConnection.release();
+  }
+};
 
 // ✅ **Retrieve PRs for Logged-in User**
 // exports.getUserPRs = async (req, res) => {
@@ -599,6 +1008,36 @@ exports.getAllPRs = async (req, res) => {
   }
 };
 
+exports.getSalesReport = async (req, res) => {
+  try {
+    // Fetch sales data for only paid PRs
+    const [salesData] = await connection.query(`
+      SELECT 
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data WHERE DATE(created_at) = CURDATE() AND payment_status = 'Paid') AS today_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data WHERE YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) AND payment_status = 'Paid') AS this_week_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND payment_status = 'Paid') AS this_month_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data WHERE YEAR(created_at) = YEAR(CURDATE()) AND payment_status = 'Paid') AS this_year_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data WHERE payment_status = 'Paid') AS total_sales
+    `);
+
+    if (salesData.length === 0) {
+      return res.status(404).json({ message: "No sales data found" });
+    }
+
+    res.status(200).json({
+      today: salesData[0].today_sales,
+      thisWeek: salesData[0].this_week_sales,
+      thisMonth: salesData[0].this_month_sales,
+      thisYear: salesData[0].this_year_sales,
+      total: salesData[0].total_sales,
+    });
+  } catch (error) {
+    console.error("Error fetching sales report:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+
 // ✅ **Update PR Order Status (SuperAdmin)**
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
   try {
@@ -651,6 +1090,7 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
       .json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 
 // ✅ **Retrieve PRs for Logged-in User**

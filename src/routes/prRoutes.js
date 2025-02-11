@@ -26,6 +26,21 @@ router.post(
   prOrderDataController.submitPR
 );
 
+router.post(
+  "/add-custom-order",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prOrderDataController.addUserPrOrder
+);
+
+
+router.put(
+  "/superadmin/update-order/:pr_id",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prOrderDataController.updatePRCountriesAndCategories
+);
+
 // ✅ One API to insert all data at once
 router.post(
   "/submit-custom-order",
@@ -45,6 +60,13 @@ router.get(
   "/all-custom-order",
   apiKeyMiddleware,
   prOrderDataController.getAllCustomOrders
+);
+
+router.get(
+  "/all-sales",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prOrderDataController.getSalesReport
 );
 
 // ✅ Update Order/Plan Activation via `perma` in URL

@@ -81,7 +81,34 @@ exports.registerUser = async (req, res) => {
       ]
     );
     console.log("User inserted into database:", result);
+    const mailOptions = {
+      from: "IMCWire <Orders@imcwire.com>",
+      to: email,
+      subject: "Welcome to IMCWire",
+      html: `
+        <html>
+        <body>
+          <div style="background-color: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+            <h2>Dear ${username},</h2>
+            <p>Welcome to the IMCWire family!</p>
+            <p>Thank you for registering. Your press release distribution journey starts now.</p>
+            <p>Explore your dashboard and start submitting press releases today.</p>
+            <p>Best regards,<br/>The IMCWire Team</p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+    await transporter.sendMail(mailOptions);
 
+    const adminEmails = ["admin@imcwire.com", "imcwirenotifications@gmail.com"];
+    const adminMailOptions = {
+      from: "IMCWire <Orders@imcwire.com>",
+      to: adminEmails.join(","),
+      subject: "New User Registration",
+      text: `A new user has registered with email: ${email}`,
+    };
+    await transporter.sendMail(adminMailOptions);
     await dbConnection.commit();
     console.log("Transaction committed.");
     res.status(201).json({

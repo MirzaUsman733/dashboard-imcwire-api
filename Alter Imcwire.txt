@@ -1,0 +1,2 @@
+ALTER TABLE pr_data 
+MODIFY COLUMN payment_method ENUM('Stripe', 'Paypro', 'manual_payment') NOT NULL;
