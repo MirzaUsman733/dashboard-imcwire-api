@@ -1041,6 +1041,60 @@ exports.getSalesReport = async (req, res) => {
 };
 
 
+exports.getUserSalesReport = async (req, res) => {
+  try {
+    // Ensure that the middleware has provided an authenticated user id.
+    const userId = req.user.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized: No user ID provided." });
+    }
+
+    // Query the sales data for only paid PRs belonging to the authenticated user.
+    // Note: We use parameterized queries (the '?' placeholders) to safely inject the userId.
+    const [salesData] = await connection.query(`
+      SELECT 
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
+          WHERE DATE(created_at) = CURDATE() 
+            AND payment_status = 'Paid' 
+            AND user_id = ?) AS today_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
+          WHERE YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) 
+            AND payment_status = 'Paid' 
+            AND user_id = ?) AS this_week_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
+          WHERE YEAR(created_at) = YEAR(CURDATE()) 
+            AND MONTH(created_at) = MONTH(CURDATE()) 
+            AND payment_status = 'Paid' 
+            AND user_id = ?) AS this_month_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
+          WHERE YEAR(created_at) = YEAR(CURDATE()) 
+            AND payment_status = 'Paid' 
+            AND user_id = ?) AS this_year_sales,
+        (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
+          WHERE payment_status = 'Paid' 
+            AND user_id = ?) AS total_sales
+    `, [userId, userId, userId, userId, userId]);
+
+    // Check if any sales data was returned.
+    if (!salesData || salesData.length === 0) {
+      return res.status(404).json({ message: "No sales data found for this user." });
+    }
+
+    // Return the sales report for the authenticated user.
+    res.status(200).json({
+      today: salesData[0].today_sales,
+      thisWeek: salesData[0].this_week_sales,
+      thisMonth: salesData[0].this_month_sales,
+      thisYear: salesData[0].this_year_sales,
+      total: salesData[0].total_sales,
+    });
+  } catch (error) {
+    console.error("Error fetching user sales report:", error);
+    res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+
 // ✅ **Update PR Order Status (SuperAdmin)**
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
   try {

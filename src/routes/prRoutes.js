@@ -77,9 +77,16 @@ router.get(
 
 router.get(
   "/all-sales",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   prOrderDataController.getSalesReport
+);
+
+router.get(
+  "/user-sales",
+  authMiddleware,
+  apiKeyMiddleware,
+  prOrderDataController.getUserSalesReport
 );
 
 // ✅ Update Order/Plan Activation via `perma` in URL

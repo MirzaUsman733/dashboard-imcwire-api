@@ -316,8 +316,8 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
 
     // Insert into single_pr_details
     const [singlePrResult] = await dbConnection.query(
-      "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type, status) VALUES (?, ?, ?, ?, ?)",
-      [pr_id, user_id, company_id, pr_type, "Approved"]
+      "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type) VALUES (?, ?, ?, ?)",
+      [pr_id, user_id, company_id]
     );
     const singlePrId = singlePrResult.insertId;
     // Update plan_records to increment used PRs
@@ -412,7 +412,6 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
   }
 };
 
-// Update an already submitted single PR (by Super Admin)
 // Now the endpoint expects single_pr_id as a URL parameter
 exports.updateSinglePRBySuperAdmin = async (req, res) => {
   let dbConnection;
