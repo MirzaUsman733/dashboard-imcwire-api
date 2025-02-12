@@ -324,7 +324,6 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
       [pr_id, user_id, company_id, pr_type]
     );
     const singlePrId = singlePrResult.insertId;
-    console.log(user_id, plan_id, pr_id)
     // Update plan_records to increment used PRs
     await dbConnection.query(
       "UPDATE plan_records SET used_prs = used_prs + 1 WHERE user_id = ? AND plan_id = ? AND pr_id = ?",
