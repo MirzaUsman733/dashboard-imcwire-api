@@ -220,7 +220,6 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     const isFormData = req.headers["content-type"]?.includes("multipart/form-data");
     let { pr_id, url, tags, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl } = req.body;
     const pdfFile = isFormData ? req.file : null;
-    const user_id = req.user?.id; // Ensure this is set
 
     // Ensure pr_id is provided
     if (!pr_id) {
@@ -229,7 +228,14 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
 
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction();
-
+    const [prData] = await dbConnection.query(
+      "SELECT id, user_id, prType, plan_id, payment_status, pr_status FROM pr_data WHERE id = ?",
+      [pr_id]
+    );
+    if (prData.length === 0) {
+      return res.status(404).json({ message: "PR not found." });
+    }
+    const user_id = prData[0].user_id
     // Optionally insert company if company details are provided
     let company_id;
     if (companyName && email) {
@@ -260,13 +266,7 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     }
 
     // Fetch PR Data
-    const [prData] = await dbConnection.query(
-      "SELECT id, user_id, prType, plan_id, payment_status, pr_status FROM pr_data WHERE id = ?",
-      [pr_id]
-    );
-    if (prData.length === 0) {
-      return res.status(404).json({ message: "PR not found." });
-    }
+ 
     const pr = prData[0];
     const plan_id = pr.plan_id;
 
