@@ -247,7 +247,7 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
           companyName,
           address1,
           address2 || null,
-          contactName || null,
+          contactName,
           phone || null,
           email,
           country || null,
