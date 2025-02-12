@@ -220,7 +220,10 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     const isFormData = req.headers["content-type"]?.includes("multipart/form-data");
     let { pr_id, url, tags, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl } = req.body;
     const pdfFile = isFormData ? req.file : null;
-
+    console.log(req)
+    console.log(req.body)
+    console.log(req.file)
+    console.log(pr_id)
     // Ensure pr_id is provided
     if (!pr_id) {
       return res.status(400).json({ message: "PR id is required." });
@@ -266,7 +269,7 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     }
 
     // Fetch PR Data
- 
+
     const pr = prData[0];
     const plan_id = pr.plan_id;
 

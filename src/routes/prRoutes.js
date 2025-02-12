@@ -35,6 +35,7 @@ router.post(
 router.post(
   "/superadmin/submit-single-pr",
   SuperAdminAuthMiddleware,
+  checkFileUpload,
   apiKeyMiddleware,
   prController.submitSinglePRBySuperAdmin
 );
