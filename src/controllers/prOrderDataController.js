@@ -420,10 +420,10 @@ exports.addUserPrOrder = async (req, res) => {
 
     const targetCountryErrors = [];
     targetCountries.forEach((country, index) => {
-      if (!country.name) {
+      if (!country.countryName) {
         targetCountryErrors.push(`targetCountries[${index}].name is missing.`);
       }
-      if (country.price === undefined || country.price === null) {
+      if (country.countryPrice === undefined || country.countryPrice === null) {
         targetCountryErrors.push(`targetCountries[${index}].price is missing.`);
       }
       if (country.translationRequired) {
@@ -437,10 +437,10 @@ exports.addUserPrOrder = async (req, res) => {
 
     const industryCategoryErrors = [];
     industryCategories.forEach((category, index) => {
-      if (!category.name) {
+      if (!category.categoryName) {
         industryCategoryErrors.push(`industryCategories[${index}].name is missing.`);
       }
-      if (category.price === undefined || category.price === null) {
+      if (category.categoryPrice === undefined || category.categoryPrice === null) {
         industryCategoryErrors.push(`industryCategories[${index}].price is missing.`);
       }
     });
@@ -529,7 +529,7 @@ exports.addUserPrOrder = async (req, res) => {
       }
       const [targetCountryResult] = await dbConnection.query(
         "INSERT INTO target_countries (countryName, countryPrice, translation_required_id) VALUES (?, ?, ?)",
-        [country.name, country.price, translationId]
+        [country.countryName, country.countryPrice, translationId]
       );
       targetCountryIds.push(targetCountryResult.insertId);
     }
@@ -539,7 +539,7 @@ exports.addUserPrOrder = async (req, res) => {
     for (const category of industryCategories) {
       const [industryCategoryResult] = await dbConnection.query(
         "INSERT INTO industry_categories (categoryName, categoryPrice) VALUES (?, ?)",
-        [category.name, category.price]
+        [category.categoryName, category.categoryPrice]
       );
       industryCategoryIds.push(industryCategoryResult.insertId);
     }
@@ -671,7 +671,7 @@ exports.updatePRCountriesAndCategories = async (req, res) => {
 
       const [targetCountryResult] = await dbConnection.query(
         "INSERT INTO target_countries (countryName, countryPrice, translation_required_id) VALUES (?, ?, ?)",
-        [country.name, country.price, translationId]
+        [country.countryName, country.countryPrice, translationId]
       );
 
       await dbConnection.query(
@@ -684,7 +684,7 @@ exports.updatePRCountriesAndCategories = async (req, res) => {
     for (const category of industryCategories) {
       const [industryCategoryResult] = await dbConnection.query(
         "INSERT INTO industry_categories (categoryName, categoryPrice) VALUES (?, ?)",
-        [category.name, category.price]
+        [category.categoryName, category.categoryPrice]
       );
 
       await dbConnection.query(
@@ -915,7 +915,7 @@ exports.getAllPRs = async (req, res) => {
     for (let pr of prData) {
       // Fetch target countries, industry categories, and plan records...
       const [targetCountries] = await connection.query(
-        `SELECT tc.id, tc.countryName as name, tc.countryPrice as price, tr.translation as translationRequired, tr.translationPrice
+        `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation as translationRequired, tr.translationPrice
          FROM pr_target_countries ptc
          JOIN target_countries tc ON ptc.target_country_id = tc.id
          LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
@@ -924,7 +924,7 @@ exports.getAllPRs = async (req, res) => {
       );
 
       const [industryCategories] = await connection.query(
-        `SELECT ic.id, ic.categoryName as name, ic.categoryPrice as price
+        `SELECT ic.id, ic.categoryName, ic.categoryPrice
          FROM pr_industry_categories pic
          JOIN industry_categories ic ON pic.target_industry_id = ic.id
          WHERE pic.pr_id = ?`,
