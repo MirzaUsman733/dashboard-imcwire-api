@@ -82,7 +82,7 @@ exports.registerUser = async (req, res) => {
     );
     console.log("User inserted into database:", result);
     const mailOptions = {
-      from: "IMCWire <Orders@imcwire.com>",
+      from: `IMCWire <${process.env.SMTP_USER}>`,
       to: email,
       subject: "Welcome to IMCWire",
       html: `
@@ -90,10 +90,27 @@ exports.registerUser = async (req, res) => {
         <body>
           <div style="background-color: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
             <h2>Dear ${username},</h2>
-            <p>Welcome to the IMCWire family!</p>
-            <p>Thank you for registering. Your press release distribution journey starts now.</p>
-            <p>Explore your dashboard and start submitting press releases today.</p>
-            <p>Best regards,<br/>The IMCWire Team</p>
+             <p>Welcome to the IMCWire family! We're thrilled to have you on board and eager to collaborate in amplifying your message globally.</p>
+              <p>With a decade of expertise in press release distribution, IMCWire is dedicated to linking you with premier media outlets and organizations, ensuring your news reaches its target audience effectively. Our network boasts esteemed platforms such as Yahoo Finance, Bloomberg, MarketWatch, and over 350 other prominent news and media channels.</p>
+               <h3 style="color: #333; font-weight: bold;">As a member, here's what you can anticipate:</h3>
+              <ul>
+                  <li>Extensive Distribution: Your press releases will reach leading news outlets, maximizing visibility.</li>
+                  <li>Tailored Plans: Choose from our plans, and Corporate plans to suit your visibility and influence requirements.</li>
+                  <li>Professional Support: Our team is available to guide you every step of the way, from crafting your press release to analyzing its impact.</li>
+              </ul>
+                <h3 style="color: #333; font-weight: bold;">To kick-start your IMCWire experience, we suggest the following steps:</h3>
+              <ol>
+                  <li>Explore Your Dashboard: Log in to your account to manage your press releases and track performance.</li>
+                  <li>Schedule Your First Release: Ready to go live? Submit your debut press release through your dashboard or contact our support team for assistance.</li>
+                  <li>Reach Out: Questions or need help? Our dedicated support team is just an email or phone call away.</li>
+              </ol>
+              
+              <p><strong>Thank you for choosing IMCWire. We're honored to be part of your journey and committed to ensuring your voice resonates worldwide.</p>
+              
+            <p><strong>Let's make headlines together!</strong></p>
+              <div class="display: flex; justify-content: space-between; ">
+              <div>Warm regards,</div>
+              <div>The IMCWire Team</div>
           </div>
         </body>
         </html>
@@ -103,7 +120,7 @@ exports.registerUser = async (req, res) => {
 
     const adminEmails = ["admin@imcwire.com", "imcwirenotifications@gmail.com"];
     const adminMailOptions = {
-      from: "IMCWire <Orders@imcwire.com>",
+      from: `IMCWire <${process.env.SMTP_USER}>`,
       to: adminEmails.join(","),
       subject: "New User Registration",
       text: `A new user has registered with email: ${email}`,
