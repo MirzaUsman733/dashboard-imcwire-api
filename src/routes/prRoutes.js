@@ -39,6 +39,13 @@ router.post(
   apiKeyMiddleware,
   prController.submitSinglePRBySuperAdmin
 );
+router.put(
+  "/superadmin/update-single-pr/:single_pr_id",
+  SuperAdminAuthMiddleware,
+  checkFileUpload,
+  apiKeyMiddleware,
+  prController.updateSinglePRBySuperAdmin
+);
 
 router.put(
   "/superadmin/update-order/:pr_id",

@@ -220,10 +220,6 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     const isFormData = req.headers["content-type"]?.includes("multipart/form-data");
     let { pr_id, url, tags, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl } = req.body;
     const pdfFile = isFormData ? req.file : null;
-    console.log(req)
-    console.log(req.body)
-    console.log(req.file)
-    console.log(pr_id)
     // Ensure pr_id is provided
     if (!pr_id) {
       return res.status(400).json({ message: "PR id is required." });
@@ -320,8 +316,8 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
 
     // Insert into single_pr_details
     const [singlePrResult] = await dbConnection.query(
-      "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type) VALUES (?, ?, ?, ?)",
-      [pr_id, user_id, company_id, pr_type]
+      "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type, status) VALUES (?, ?, ?, ?, ?)",
+      [pr_id, user_id, company_id, pr_type, "Approved"]
     );
     const singlePrId = singlePrResult.insertId;
     // Update plan_records to increment used PRs
@@ -416,6 +412,311 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
   }
 };
 
+// Update an already submitted single PR (by Super Admin)
+// Now the endpoint expects single_pr_id as a URL parameter
+exports.updateSinglePRBySuperAdmin = async (req, res) => {
+  let dbConnection;
+  try {
+    // Get the single_pr_id from the URL (e.g., /api/single-pr/:single_pr_id)
+    const { single_pr_id } = req.params;
+    // Other fields come from the body:
+    let {
+      pr_id,        // the PR id from pr_data (still required)
+      url,
+      tags,
+      companyName,
+      address1,
+      address2,
+      contactName,
+      phone,
+      email,
+      country,
+      city,
+      state,
+      websiteUrl,
+    } = req.body;
+    // Determine if the request is multipart/form-data (for file upload)
+    const isFormData = req.headers["content-type"]?.includes("multipart/form-data");
+    const pdfFile = isFormData ? req.file : null;
+
+    // Basic validations: both pr_id and single_pr_id must be provided.
+    if (!pr_id) {
+      return res.status(400).json({ message: "PR id is required." });
+    }
+    if (!single_pr_id) {
+      return res.status(400).json({ message: "Single PR id is required in URL." });
+    }
+
+    dbConnection = await connection.getConnection();
+    await dbConnection.beginTransaction();
+
+    // -------------------------------------------------
+    // 1. Fetch the base PR data and perform validations.
+    // -------------------------------------------------
+    const [prData] = await dbConnection.query(
+      "SELECT id, user_id, prType, plan_id, payment_status, pr_status FROM pr_data WHERE id = ?",
+      [pr_id]
+    );
+    if (prData.length === 0) {
+      return res.status(404).json({ message: "PR not found." });
+    }
+    const pr = prData[0];
+    const user_id = pr.user_id;
+    const plan_id = pr.plan_id;
+
+    // Validate PR payment and status.
+    if (pr.payment_status === "unpaid")
+      return res.status(400).json({ message: "PR not paid." });
+    if (pr.payment_status === "refund")
+      return res.status(400).json({ message: "PR payment was refunded. You cannot update this PR." });
+    if (pr.pr_status === "Rejected")
+      return res.status(403).json({ message: "PR rejected. Please contact support to resolve the issue." });
+    if (pr.pr_status === "Pending")
+      return res.status(403).json({ message: "PR Order is not approved. Please contact support." });
+    if (pr.pr_status !== "Approved")
+      return res.status(403).json({ message: "PR is not approved for submission/update." });
+    console.log(single_pr_id, pr_id)
+    // -------------------------------------------------
+    // 2. Fetch the existing submission from single_pr_details.
+    // -------------------------------------------------
+    const [singlePrData] = await dbConnection.query(
+      "SELECT id, company_id, pr_type FROM single_pr_details WHERE id = ? AND pr_id = ?",
+      [single_pr_id, pr_id]
+    );
+    console.log(singlePrData)
+    if (singlePrData.length === 0) {
+      return res.status(404).json({ message: "Single PR submission not found." });
+    }
+    const singlePr = singlePrData[0];
+    const pr_type = singlePr.pr_type; // either "Self-Written" or "IMCWire Written"
+
+    // -------------------------------------------------
+    // 3. Update (or create) company details if provided.
+    // -------------------------------------------------
+    if (companyName && email) {
+      let company_id = singlePr.company_id;
+      if (company_id) {
+        // Update the existing company record.
+        await dbConnection.query(
+          `UPDATE companies 
+           SET companyName = ?, address1 = ?, address2 = ?, contactName = ?, phone = ?, email = ?, country = ?, city = ?, state = ?, websiteUrl = ? 
+           WHERE id = ? AND user_id = ?`,
+          [
+            companyName,
+            address1,
+            address2 || null,
+            contactName || null,
+            phone || null,
+            email,
+            country || null,
+            city || null,
+            state || null,
+            websiteUrl || null,
+            company_id,
+            user_id,
+          ]
+        );
+      } else {
+        // If no company exists yet, insert a new record.
+        const [companyResult] = await dbConnection.query(
+          `INSERT INTO companies 
+           (user_id, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            user_id,
+            companyName,
+            address1,
+            address2 || null,
+            contactName || null,
+            phone || null,
+            email,
+            country || null,
+            city || null,
+            state || null,
+            websiteUrl || null,
+          ]
+        );
+        company_id = companyResult.insertId;
+        // Link the new company record to the submission.
+        await dbConnection.query(
+          "UPDATE single_pr_details SET company_id = ? WHERE id = ?",
+          [company_id, single_pr_id]
+        );
+      }
+    }
+
+    // -------------------------------------------------
+    // 4. Validate and process fields according to the PR type.
+    // -------------------------------------------------
+    if (pr_type === "Self-Written") {
+      // For Self-Written PRs, a PDF is required if none exists,
+      // and URL/Tags must not be provided.
+      if (pdfFile) {
+        // A new PDF file will be processed below.
+      } else {
+        // If no new PDF file is provided, verify that a PDF already exists.
+        const [pdfRecord] = await dbConnection.query(
+          "SELECT id FROM pr_pdf_files WHERE single_pr_id = ?",
+          [single_pr_id]
+        );
+        if (pdfRecord.length === 0) {
+          return res.status(400).json({ message: "PDF required for Self-Written PRs." });
+        }
+      }
+      if (url || (tags && tags.length > 0)) {
+        return res.status(400).json({ message: "URL/Tags not allowed for Self-Written PRs." });
+      }
+    } else if (pr_type === "IMCWire Written") {
+      // For IMCWire-Written PRs, a URL and tags are required, and PDF must not be provided.
+      if (!url) {
+        // Check if an existing URL record exists.
+        const [urlRecord] = await dbConnection.query(
+          "SELECT id FROM pr_url_tags WHERE single_pr_id = ?",
+          [single_pr_id]
+        );
+        if (urlRecord.length === 0) {
+          return res.status(400).json({ message: "URL required for IMCWire-Written PRs." });
+        }
+      }
+      if (!tags || tags.length === 0) {
+        // Check if tags are already associated.
+        const [tagRecords] = await dbConnection.query(
+          "SELECT st.tag_id FROM single_pr_tags st WHERE st.single_pr_id = ?",
+          [single_pr_id]
+        );
+        if (tagRecords.length === 0) {
+          return res.status(400).json({ message: "Tags required for IMCWire-Written PRs." });
+        }
+      }
+      if (pdfFile) {
+        return res.status(400).json({ message: "PDF not allowed for IMCWire-Written PRs." });
+      }
+    } else {
+      return res.status(400).json({ message: "Invalid PR type." });
+    }
+
+    // -------------------------------------------------
+    // 5. Process the update based on the PR type.
+    // -------------------------------------------------
+    if (pr_type === "Self-Written") {
+      if (pdfFile) {
+        // Process the new PDF file.
+        const uniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
+        const sanitizedPdfName = pdfFile.originalname.replace(/[^a-zA-Z0-9.-]/g, "-");
+        const pdfFirstChar = sanitizedPdfName[0].toLowerCase();
+        const newFileName = `${uniqueId}_${sanitizedPdfName}`;
+        const saveFileName = sanitizedPdfName;
+        const ftpFilePath = `/public_html/files/uploads/pdf-Data/${pdfFirstChar}/${newFileName}`;
+
+        // Write the file temporarily.
+        const tempFilePath = path.join(os.tmpdir(), newFileName);
+        fs.writeFileSync(tempFilePath, pdfFile.buffer);
+
+        // Upload via FTP.
+        const client = new Client();
+        await client.access(ftpConfig);
+        await client.ensureDir(`/public_html/files/uploads/pdf-Data/${pdfFirstChar}`);
+        await client.uploadFrom(tempFilePath, ftpFilePath);
+        client.close();
+
+        // Update (or insert) the record in pr_pdf_files.
+        const [pdfRecord] = await dbConnection.query(
+          "SELECT id FROM pr_pdf_files WHERE single_pr_id = ?",
+          [single_pr_id]
+        );
+        if (pdfRecord.length > 0) {
+          // Update the existing record.
+          await dbConnection.query(
+            "UPDATE pr_pdf_files SET unique_id = ?, pdf_file = ?, url = ? WHERE id = ?",
+            [uniqueId, saveFileName, ftpFilePath.replace("/public_html/files", ""), pdfRecord[0].id]
+          );
+        } else {
+          // Insert a new record.
+          const [pdfInsert] = await dbConnection.query(
+            "INSERT INTO pr_pdf_files (single_pr_id, unique_id, pdf_file, url) VALUES (?, ?, ?, ?)",
+            [single_pr_id, uniqueId, saveFileName, ftpFilePath.replace("/public_html/files", "")]
+          );
+          // Link the new PDF record to the submission.
+          await dbConnection.query(
+            "UPDATE single_pr_details SET pdf_id = ? WHERE id = ?",
+            [pdfInsert.insertId, single_pr_id]
+          );
+        }
+        // Remove the temporary file.
+        fs.unlinkSync(tempFilePath);
+      }
+    } else if (pr_type === "IMCWire Written") {
+      // Update the URL if a new one is provided.
+      if (url) {
+        const [urlRecord] = await dbConnection.query(
+          "SELECT id FROM pr_url_tags WHERE single_pr_id = ?",
+          [single_pr_id]
+        );
+        if (urlRecord.length > 0) {
+          await dbConnection.query(
+            "UPDATE pr_url_tags SET url = ? WHERE id = ?",
+            [url, urlRecord[0].id]
+          );
+        } else {
+          const [urlInsert] = await dbConnection.query(
+            "INSERT INTO pr_url_tags (single_pr_id, url) VALUES (?, ?)",
+            [single_pr_id, url]
+          );
+          await dbConnection.query(
+            "UPDATE single_pr_details SET url_tags_id = ? WHERE id = ?",
+            [urlInsert.insertId, single_pr_id]
+          );
+        }
+      }
+      // Update tags if new tags are provided.
+      if (tags && tags.length > 0) {
+        // Remove existing tag associations.
+        await dbConnection.query(
+          "DELETE FROM single_pr_tags WHERE single_pr_id = ?",
+          [single_pr_id]
+        );
+        // Process and insert each tag.
+        for (const tag of tags) {
+          let tagId;
+          const [existingTag] = await dbConnection.query(
+            "SELECT id FROM tags WHERE name = ?",
+            [tag]
+          );
+          if (existingTag.length > 0) {
+            tagId = existingTag[0].id;
+          } else {
+            const [tagInsert] = await dbConnection.query(
+              "INSERT INTO tags (name) VALUES (?)",
+              [tag]
+            );
+            tagId = tagInsert.insertId;
+          }
+          await dbConnection.query(
+            "INSERT INTO single_pr_tags (single_pr_id, tag_id) VALUES (?, ?)",
+            [single_pr_id, tagId]
+          );
+        }
+      }
+    }
+
+    // -------------------------------------------------
+    // 6. (Optional) Update other related records.
+    // For example, you might update plan_records if needed.
+    // -------------------------------------------------
+
+    // Commit the transaction and return a success message.
+    await dbConnection.commit();
+    res.status(200).json({
+      message: "Single PR updated successfully.",
+    });
+  } catch (error) {
+    if (dbConnection) await dbConnection.rollback();
+    console.error("Error in updating PR:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  } finally {
+    if (dbConnection) dbConnection.release();
+  }
+};
 
 
 
