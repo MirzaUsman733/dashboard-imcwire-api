@@ -217,140 +217,136 @@ exports.submitSinglePR = async (req, res) => {
 exports.submitSinglePRBySuperAdmin = async (req, res) => {
   let dbConnection;
   try {
-    const isFormData = req.headers["content-type"]?.includes(
-      "multipart/form-data"
-    );
-    // ✅ Extract Fields
-    let { pr_id, company_id, url, tags } = req.body;
+    const isFormData = req.headers["content-type"]?.includes("multipart/form-data");
+    let { pr_id, url, tags, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl } = req.body;
     const pdfFile = isFormData ? req.file : null;
-    // const user_id = req.user?.id;
+    const user_id = req.user?.id; // Ensure this is set
 
-    if (!pr_id || !company_id) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields: pr_id or company_id." });
+    // Ensure pr_id is provided
+    if (!pr_id) {
+      return res.status(400).json({ message: "PR id is required." });
     }
 
     dbConnection = await connection.getConnection();
     await dbConnection.beginTransaction();
 
-    // ✅ 1. Fetch PR Data and Verify Ownership
+    // Optionally insert company if company details are provided
+    let company_id;
+    if (companyName && email) {
+      const [companyResult] = await dbConnection.query(
+        `INSERT INTO companies 
+         (user_id, companyName, address1, address2, contactName, phone, email, country, city, state, websiteUrl) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          user_id,
+          companyName,
+          address1,
+          address2 || null,
+          contactName || null,
+          phone || null,
+          email,
+          country || null,
+          city || null,
+          state || null,
+          websiteUrl || null,
+        ]
+      );
+      company_id = companyResult.insertId;
+    } else {
+      // Optionally fetch an existing company if needed
+      // For example:
+      // const [companyData] = await dbConnection.query("SELECT id FROM companies WHERE user_id = ?", [user_id]);
+      // company_id = companyData?.[0]?.id;
+    }
+
+    // Fetch PR Data
     const [prData] = await dbConnection.query(
       "SELECT id, user_id, prType, plan_id, payment_status, pr_status FROM pr_data WHERE id = ?",
       [pr_id]
     );
-
-    if (prData.length === 0)
+    if (prData.length === 0) {
       return res.status(404).json({ message: "PR not found." });
-
+    }
     const pr = prData[0];
     const plan_id = pr.plan_id;
-    const user_id = pr.user_id;
-    // ✅ 2. Validate PR Ownership, Payment, and Approval
+
+    console.log(plan_id)
+    // You might want to override user_id or ensure consistency:
+    // const user_id = pr.user_id; // Only if you are sure about it
+
+    // Validate PR statuses
     if (pr.payment_status === "unpaid")
       return res.status(400).json({ message: "PR not paid." });
     if (pr.payment_status === "refund")
-      return res
-        .status(400)
-        .json({
-          message: "PR payment was refunded. You cannot submit this PR.",
-        });
+      return res.status(400).json({ message: "PR payment was refunded. You cannot submit this PR." });
     if (pr.pr_status === "Rejected")
-      return res.status(403).json({
-        message: "PR rejected. Please contact support to resolve the issue.",
-      });
+      return res.status(403).json({ message: "PR rejected. Please contact support to resolve the issue." });
     if (pr.pr_status === "Pending")
-      return res
-        .status(403)
-        .json({ message: "PR Order is not approved. Please contact support." });
-
-    // Check if the PR is approved before continuing
+      return res.status(403).json({ message: "PR Order is not approved. Please contact support." });
     if (pr.pr_status !== "Approved")
-      return res
-        .status(403)
-        .json({ message: "PR is not approved for submission." });
+      return res.status(403).json({ message: "PR is not approved for submission." });
 
-    // ✅ 3. Check Company Ownership
-    const [companyData] = await dbConnection.query(
-      "SELECT id FROM companies WHERE id = ? AND user_id = ?",
-      [company_id, user_id]
-    );
-
-    if (companyData.length === 0)
-      return res
-        .status(404)
-        .json({ message: "Company not found or unauthorized to this user." });
+    // If a new company was created, verify its ownership
+    if (company_id) {
+      const [companyData] = await dbConnection.query(
+        "SELECT id FROM companies WHERE id = ? AND user_id = ?",
+        [company_id, user_id]
+      );
+      if (companyData.length === 0) {
+        return res.status(404).json({ message: "Company not found or unauthorized to this user." });
+      }
+    }
 
     const pr_type = pr.prType;
-
-    // ✅ 4. Validate Required Fields Based on PR Type
+    // Validate required fields based on PR type
     if (pr_type === "Self-Written") {
       if (!pdfFile)
-        return res
-          .status(400)
-          .json({ message: "PDF required for Self-Written PRs." });
+        return res.status(400).json({ message: "PDF required for Self-Written PRs." });
       if (url || (tags && tags.length > 0))
-        return res
-          .status(400)
-          .json({ message: "URL/Tags not allowed for Self-Written PRs." });
+        return res.status(400).json({ message: "URL/Tags not allowed for Self-Written PRs." });
     } else if (pr_type === "IMCWire Written") {
       if (!url)
-        return res
-          .status(400)
-          .json({ message: "URL required for IMCWire-Written PRs." });
+        return res.status(400).json({ message: "URL required for IMCWire-Written PRs." });
       if (!tags || tags.length === 0)
-        return res
-          .status(400)
-          .json({ message: "Tags required for IMCWire-Written PRs." });
+        return res.status(400).json({ message: "Tags required for IMCWire-Written PRs." });
       if (pdfFile)
-        return res
-          .status(400)
-          .json({ message: "PDF not allowed for IMCWire-Written PRs." });
+        return res.status(400).json({ message: "PDF not allowed for IMCWire-Written PRs." });
     } else {
       return res.status(400).json({ message: "Invalid PR type." });
     }
 
-    // ✅ 5. Insert PR Record
+    // Insert into single_pr_details
     const [singlePrResult] = await dbConnection.query(
       "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type) VALUES (?, ?, ?, ?)",
       [pr_id, user_id, company_id, pr_type]
     );
-    // ✅ 6. Update Plan Record (Increment Used PRs)
+    const singlePrId = singlePrResult.insertId;
+    console.log(user_id, plan_id, pr_id)
+    // Update plan_records to increment used PRs
     await dbConnection.query(
       "UPDATE plan_records SET used_prs = used_prs + 1 WHERE user_id = ? AND plan_id = ? AND pr_id = ?",
       [user_id, plan_id, pr_id]
     );
-    const singlePrId = singlePrResult.insertId;
 
-    // ✅ 6. Handle PR Upload Based on Type
+    // Handle file or URL/tag processing based on pr_type
     if (pr_type === "Self-Written") {
-      // ✅ Generate Unique File Name
+      // --- PDF Upload Logic ---
       const uniqueId = uuidv4().replace(/-/g, "").substring(0, 20);
-      const sanitizedPdfName = pdfFile.originalname.replace(
-        /[^a-zA-Z0-9.-]/g,
-        "-"
-      );
+      const sanitizedPdfName = pdfFile.originalname.replace(/[^a-zA-Z0-9.-]/g, "-");
       const pdfFirstChar = sanitizedPdfName[0].toLowerCase();
       const newFileName = `${uniqueId}_${sanitizedPdfName}`;
       const saveFileName = sanitizedPdfName;
       const ftpFilePath = `/public_html/files/uploads/pdf-Data/${pdfFirstChar}/${newFileName}`;
 
-      // ✅ Write Buffer to a Temp File Before Uploading
       const tempFilePath = path.join(os.tmpdir(), newFileName);
       fs.writeFileSync(tempFilePath, pdfFile.buffer);
 
-      // ✅ Upload PDF Directly to FTP from the Temp File
       const client = new Client();
       await client.access(ftpConfig);
-      await client.ensureDir(
-        `/public_html/files/uploads/pdf-Data/${pdfFirstChar}`
-      );
-
-      // ✅ Upload from Temp File (Fixing `source.once` error)
+      await client.ensureDir(`/public_html/files/uploads/pdf-Data/${pdfFirstChar}`);
       await client.uploadFrom(tempFilePath, ftpFilePath);
       client.close();
 
-      // ✅ Insert into `pr_pdf_files`
       const [pdfInsert] = await dbConnection.query(
         "INSERT INTO pr_pdf_files (single_pr_id, unique_id, pdf_file, url) VALUES (?, ?, ?, ?)",
         [
@@ -366,16 +362,14 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
         [pdfInsert.insertId, singlePrId]
       );
 
-      // ✅ Delete Temp File After Upload
       fs.unlinkSync(tempFilePath);
     } else if (pr_type === "IMCWire Written") {
-      // ✅ Insert URL
+      // --- URL and Tags Logic ---
       const [urlInsert] = await dbConnection.query(
         "INSERT INTO pr_url_tags (single_pr_id, url) VALUES (?, ?)",
         [singlePrId, url]
       );
 
-      // ✅ Insert Tags
       for (const tag of tags) {
         let tagId;
         const [existingTag] = await dbConnection.query(
@@ -405,18 +399,23 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
       );
     }
 
+    // Commit the transaction and send a success response
     await dbConnection.commit();
     res.status(201).json({
       message: "Single PR submitted successfully.",
-      single_pr_id: singlePrId,
+      company_id,
     });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
+    console.error("Error in submitting PR:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();
   }
 };
+
+
+
 
 exports.updateSinglePR = async (req, res) => {
   let dbConnection;

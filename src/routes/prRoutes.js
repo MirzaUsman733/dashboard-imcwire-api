@@ -32,7 +32,12 @@ router.post(
   apiKeyMiddleware,
   prOrderDataController.addUserPrOrder
 );
-
+router.post(
+  "/superadmin/submit-single-pr",
+  SuperAdminAuthMiddleware,
+  apiKeyMiddleware,
+  prController.submitSinglePRBySuperAdmin
+);
 
 router.put(
   "/superadmin/update-order/:pr_id",

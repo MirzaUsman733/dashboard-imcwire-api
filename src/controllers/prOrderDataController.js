@@ -302,8 +302,8 @@ exports.submitPR = async (req, res) => {
     const planNameForEmail = planItem[0].planName;
     // Commit the transaction if all operations succeeded
     await dbConnection.commit();
-     // Construct the email content with order details and the payment link
-     const emailHtml = `
+    // Construct the email content with order details and the payment link
+    const emailHtml = `
      <h2>Hello ${username},</h2>
      <p>Your PR order has been successfully created. Below are your order details:</p>
      <h3>Order Details</h3>
@@ -321,22 +321,22 @@ exports.submitPR = async (req, res) => {
      <p>Best regards,<br>IMCWire Support Team</p>
    `;
 
-   // Send the email
-   transporter.sendMail(
-     {
-       from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
-       to: userEmail,
-       subject: "Your PR Order & Payment Details",
-       html: emailHtml,
-     },
-     (err, info) => {
-       if (err) {
-         console.error("Error sending email:", err);
-       } else {
-         console.log("Email sent:", info.response);
-       }
-     }
-   );
+    // Send the email
+    transporter.sendMail(
+      {
+        from: `"IMCWire Support" <${process.env.SMTP_USER}>`,
+        to: userEmail,
+        subject: "Your PR Order & Payment Details",
+        html: emailHtml,
+      },
+      (err, info) => {
+        if (err) {
+          console.error("Error sending email:", err);
+        } else {
+          console.log("Email sent:", info.response);
+        }
+      }
+    );
 
     return res.status(201).json({
       message: "We are redirecting you to the payment page.",
@@ -915,7 +915,7 @@ exports.getAllPRs = async (req, res) => {
     for (let pr of prData) {
       // Fetch target countries, industry categories, and plan records...
       const [targetCountries] = await connection.query(
-        `SELECT tc.id, tc.countryName, tc.countryPrice, tr.translation, tr.translationPrice
+        `SELECT tc.id, tc.countryName as name, tc.countryPrice as price, tr.translation as translationRequired, tr.translationPrice
          FROM pr_target_countries ptc
          JOIN target_countries tc ON ptc.target_country_id = tc.id
          LEFT JOIN translation_required tr ON tc.translation_required_id = tr.id
@@ -924,7 +924,7 @@ exports.getAllPRs = async (req, res) => {
       );
 
       const [industryCategories] = await connection.query(
-        `SELECT ic.id, ic.categoryName, ic.categoryPrice
+        `SELECT ic.id, ic.categoryName as name, ic.categoryPrice as price
          FROM pr_industry_categories pic
          JOIN industry_categories ic ON pic.target_industry_id = ic.id
          WHERE pic.pr_id = ?`,
