@@ -1283,7 +1283,7 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
 
     // ✅ Fetch user details to send email notification
     const [userResults] = await connection.query(
-      "SELECT email, username FROM users WHERE id = ?",
+      "SELECT email, username FROM auth_user WHERE id = ?",
       [userId]
     );
 
