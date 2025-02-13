@@ -50,22 +50,18 @@ exports.registerUser = async (req, res) => {
 
   try {
     dbConnection = await connection.getConnection();
-    console.log("Database connection successfully established.");
     await dbConnection.beginTransaction();
-    console.log("Transaction started.");
 
     const [existingUser] = await dbConnection.query(
       "SELECT * FROM auth_user WHERE email = ?",
       [email]
     );
-    console.log("Checked for existing user:", existingUser);
     if (existingUser.length > 0) {
       return res.status(400).json({ message: "User already exists" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
-    console.log("Password hashed.");
     const { encrypted, iv } = encryptPassword(password); // Check this function's existence and correctness
 
     const [result] = await dbConnection.query(
@@ -80,7 +76,6 @@ exports.registerUser = async (req, res) => {
         "active",
       ]
     );
-    console.log("User inserted into database:", result);
     const mailOptions = {
       from: `IMCWire <${process.env.SMTP_USER}>`,
       to: email,
@@ -127,7 +122,6 @@ exports.registerUser = async (req, res) => {
     };
     await transporter.sendMail(adminMailOptions);
     await dbConnection.commit();
-    console.log("Transaction committed.");
     res.status(201).json({
       message: "User registered successfully",
     });
@@ -137,14 +131,12 @@ exports.registerUser = async (req, res) => {
     res.status(500).json({ error: "Error registering user" });
   } finally {
     if (dbConnection) dbConnection.release();
-    console.log("Database connection released.");
   }
 };
 
 // Login user
 exports.loginUser = async (req, res) => {
   const { email, password, ipAddress } = req.body;
-console.log(email, password)
   try {
     const [results] = await connection.query(
       "SELECT * FROM auth_user WHERE email = ?",
@@ -600,7 +592,6 @@ exports.superadminUpdateUser = async (req, res) => {
       updates,
     });
   } catch (error) {
-    console.log(error);
     return res
       .status(500)
       .json({ error: "Error updating user role/status", error });

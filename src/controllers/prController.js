@@ -269,7 +269,6 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     const pr = prData[0];
     const plan_id = pr.plan_id;
 
-    console.log(plan_id)
     // You might want to override user_id or ensure consistency:
     // const user_id = pr.user_id; // Only if you are sure about it
 
@@ -474,7 +473,7 @@ exports.updateSinglePRBySuperAdmin = async (req, res) => {
       return res.status(403).json({ message: "PR Order is not approved. Please contact support." });
     if (pr.pr_status !== "Approved")
       return res.status(403).json({ message: "PR is not approved for submission/update." });
-    console.log(single_pr_id, pr_id)
+
     // -------------------------------------------------
     // 2. Fetch the existing submission from single_pr_details.
     // -------------------------------------------------
@@ -482,7 +481,6 @@ exports.updateSinglePRBySuperAdmin = async (req, res) => {
       "SELECT id, company_id, pr_type FROM single_pr_details WHERE id = ? AND pr_id = ?",
       [single_pr_id, pr_id]
     );
-    console.log(singlePrData)
     if (singlePrData.length === 0) {
       return res.status(404).json({ message: "Single PR submission not found." });
     }

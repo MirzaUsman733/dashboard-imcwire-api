@@ -10,7 +10,6 @@ require("dotenv").config();
 
 // Helper functions for AES encryption and decryption
 function encryptPassword(password) {
-  console.log(password);
   if (!password) {
     throw new Error("Password is required for encryption");
   }
@@ -534,7 +533,6 @@ exports.addUserPrOrder = async (req, res) => {
 
       const salt = await bcrypt.genSalt(10);
       const password_hash = await bcrypt.hash(userPassword, salt);
-      console.log(password_hash);
       const { encrypted, iv } = encryptPassword(userPassword);
       const [userInsertResult] = await dbConnection.query(
         "INSERT INTO auth_user (username, email, password, aes_password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -548,7 +546,6 @@ exports.addUserPrOrder = async (req, res) => {
           "active",
         ]
       );
-      console.log(userInsertResult);
       user_id = userInsertResult.insertId;
     }
 
@@ -753,7 +750,6 @@ exports.addUserPrOrder = async (req, res) => {
 exports.updatePRCountriesAndCategories = async (req, res) => {
   const { pr_id } = req.params; // PR ID from URL
   const { targetCountries, industryCategories } = req.body;
-  console.log(req);
   if (!pr_id) {
     return res.status(400).json({ message: "PR ID is required" });
   }
