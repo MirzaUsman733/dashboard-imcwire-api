@@ -198,7 +198,7 @@ exports.createOrder = async (req, res) => {
 
 exports.getOrderStatus = async (req, res) => {
   try {
-    const { id } = req.body;
+    const { ordId } = req.body;
 
     // Authenticate and get token
     const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
@@ -223,7 +223,7 @@ exports.getOrderStatus = async (req, res) => {
     const orderStatusResponse = await fetch(
       `https://api.paypro.com.pk/v2/ppro/ggos?userName=${encodeURIComponent(
         "NUXLAY"
-      )}&cpayId=${id}`,
+      )}&cpayId=${ordId}`,
       {
         method: "GET",
         headers: {
