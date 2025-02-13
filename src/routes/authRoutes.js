@@ -11,7 +11,7 @@ const recaptchaMiddleware = require("../middleware/recaptchaMiddleware");
 router.post(
   "/register",
   apiKeyMiddleware,
-  recaptchaMiddleware,
+  // recaptchaMiddleware,
   [
     body("name").notEmpty().withMessage("Name is required"),
     body("email").isEmail().withMessage("Valid email is required"),
@@ -24,7 +24,7 @@ router.post(
 
 router.post(
   "/login",
-  recaptchaMiddleware,
+  // recaptchaMiddleware,
   apiKeyMiddleware,
   [
     body("email").isEmail().withMessage("Valid email is required"),
