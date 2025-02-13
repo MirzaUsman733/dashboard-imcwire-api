@@ -13,7 +13,7 @@ router.post("/stripe-checkout", paymentController.handleStripePayment);
 // Route To Create Paypro Order
 router.post("/paypro-checkout", orderController.createOrder);
 // Route to check order status
-router.get("/checkOrderStatus", orderController.getOrderStatus);
+router.post("/checkOrderStatus", orderController.getOrderStatus);
 
 router.get(
   "/user/:userId",
