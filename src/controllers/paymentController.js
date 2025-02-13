@@ -81,8 +81,8 @@ exports.handleStripePayment = async (req, res) => {
       customer_email: email,
       client_reference_id: clientId,
       mode: "payment",
-      success_url: `https://dashboard.imcwire.com/thankyou-stripe/${clientId}?isvalid=true`,
-      cancel_url: `https://dashboard.imcwire.com/thankyou-stripe/${clientId}?isvalid=false`,
+      success_url: `https://dashboard.imcwire.com/dashboard/thankyou/${clientId}?isvalid=true`,
+      cancel_url: `https://dashboard.imcwire.com/dashboard/thankyou/${clientId}?isvalid=false`,
     });
 
     // ✅ Retrieve Session Details Immediately

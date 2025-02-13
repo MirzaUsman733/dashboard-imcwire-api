@@ -251,8 +251,8 @@ exports.submitPR = async (req, res) => {
         customer_email: userEmail,
         client_reference_id: client_id,
         mode: "payment",
-        success_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=true`,
-        cancel_url: `https://dashboard.imcwire.com/thankyou-stripe/${client_id}?isvalid=false`,
+        success_url: `https://dashboard.imcwire.com/dashboard/thankyou/${client_id}?isvalid=true`,
+        cancel_url: `https://dashboard.imcwire.com/dashboard/thankyou/${client_id}?isvalid=false`,
       });
       paymentUrl = session.url;
     } else if (payment_method === "Paypro") {
@@ -318,7 +318,7 @@ exports.submitPR = async (req, res) => {
       );
       const result = await orderResponse.json();
       if (orderResponse.ok && result[0]?.Status === "00") {
-        paymentUrl = `${result[1]?.Click2Pay}&callback_url=https://dashboard.imcwire.com/thankyou`;
+        paymentUrl = `${result[1]?.Click2Pay}&callback_url=https://dashboard.imcwire.com/dashboard/paypro/thankyou`;
       } else {
         await dbConnection.rollback();
         return res.status(500).json({

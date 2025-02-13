@@ -171,7 +171,7 @@ exports.createOrder = async (req, res) => {
     if (orderResponse.ok && result[0]?.Status === "00") {
       const click2PayUrl = result[1]?.Click2Pay;
       if (click2PayUrl) {
-        const finalUrl = `${click2PayUrl}&callback_url=https://dashboard.imcwire.com/thankyou`;
+        const finalUrl = `${click2PayUrl}&callback_url=https://dashboard.imcwire.com/dashboard/paypro/thankyou`;
 
         await dbConnection.commit();
         dbConnection.release();
