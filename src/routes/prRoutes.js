@@ -28,20 +28,20 @@ router.post(
 
 router.post(
   "/add-custom-order",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   prOrderDataController.addUserPrOrder
 );
 router.post(
   "/superadmin/submit-single-pr",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   checkFileUpload,
   apiKeyMiddleware,
   prController.submitSinglePRBySuperAdmin
 );
 router.put(
   "/update-single-pr-admin/:single_pr_id",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   checkFileUpload,
   apiKeyMiddleware,
   prController.updateSinglePRBySuperAdmin
@@ -49,7 +49,7 @@ router.put(
 
 router.put(
   "/superadmin/update-order/:pr_id",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   prOrderDataController.updatePRCountriesAndCategories
 );
@@ -57,7 +57,7 @@ router.put(
 // ✅ One API to insert all data at once
 router.post(
   "/submit-custom-order",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   apiKeyMiddleware,
   prOrderDataController.submitCustomOrder
 );
@@ -100,7 +100,7 @@ router.put(
 router.delete(
   "/custom-order/:orderId",
   apiKeyMiddleware,
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   prOrderDataController.deleteCustomOrder
 );
 

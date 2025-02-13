@@ -1377,6 +1377,7 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
   try {
     const { status, pr_id } = req.body;
     const { single_pr_id } = req.params;
+
     // Ensure user is superAdmin
     const user_role = req.user?.role;
     if (user_role !== "super_admin") {
@@ -1385,6 +1386,7 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
 
     dbConnection = await connection.getConnection();
 
+    // Get the existing PR record
     const [existingPR] = await dbConnection.query(
       `SELECT spd.status, spd.user_id, pd.plan_id 
        FROM single_pr_details spd
@@ -1392,6 +1394,7 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
        WHERE spd.id = ? AND spd.pr_id = ?`,
       [single_pr_id, pr_id]
     );
+
     if (existingPR.length === 0) {
       return res.status(400).json({
         message:
@@ -1403,7 +1406,7 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
     const previousStatus = existingPR[0].status;
     const planId = existingPR[0].plan_id;
 
-    // Fetch user email from auth_user table
+    // Fetch user email and username from auth_user table
     const [user] = await dbConnection.query(
       "SELECT email, username FROM auth_user WHERE auth_user_id = ?",
       [userId]
@@ -1420,7 +1423,8 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
       "UPDATE single_pr_details SET status = ? WHERE id = ?",
       [status, single_pr_id]
     );
-    // Check if the status changed to 'rejected' and previous status was not 'rejected'
+
+    // If the status changed to 'rejected' (and was not already rejected), update plan_records
     if (
       status.toLowerCase() === "rejected" &&
       previousStatus.toLowerCase() !== "rejected"
@@ -1430,6 +1434,7 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
         [userId, planId, pr_id]
       );
     }
+
     // Define notification message based on status
     let notificationMessage;
     switch (status.toLowerCase()) {
@@ -1444,17 +1449,19 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
         break;
       case "rejected":
         notificationMessage = `Your Single PR #${single_pr_id} has been rejected. Please contact support for more details.`;
+        break;
       default:
         notificationMessage = `Your PR #${single_pr_id} status has been updated to ${status}.`;
     }
 
-    // ✅ Add notification for status update
+    // Insert notification record for the user
     await dbConnection.query(
       "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
       [userId, "PR Status Updated", notificationMessage]
     );
-    // Send email notification
-    const mailOptions = {
+
+    // Prepare email notification for the user
+    const userMailOptions = {
       from: "IMCWire <Orders@imcwire.com>",
       to: userEmail,
       subject: `Your PR# ${single_pr_id} Status has been updated to ${status} - IMCWire`,
@@ -1467,15 +1474,35 @@ exports.updatePRStatusBySuperAdmin = async (req, res) => {
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail(userMailOptions);
+
+    // Also send a notification email to admin addresses
+    const adminEmails = ["admin@imcwire.com", "imcwirenotifications@gmail.com"];
+    const adminMailOptions = {
+      from: "IMCWire <Orders@imcwire.com>",
+      to: adminEmails.join(","),
+      subject: `PR# ${single_pr_id} Status Updated to ${status}`,
+      html: `
+        <p><strong>Admin Notification</strong></p>
+        <p>The status for PR# ${single_pr_id} has been updated to <strong>${status}</strong>.</p>
+        <p>User: ${username} (ID: ${userId})</p>
+        <p>Previous Status: ${previousStatus}</p>
+        <p>Plan ID: ${planId}</p>
+        <p>Please review the update in the admin panel.</p>
+      `,
+    };
+
+    await transporter.sendMail(adminMailOptions);
 
     res.status(200).json({
-      message: "PR status updated successfully and email sent.",
+      message: "PR status updated successfully and emails sent.",
       single_pr_id: single_pr_id,
     });
   } catch (error) {
+    console.error("Error updating PR status:", error);
     res.status(500).json({ message: "Internal Server Error" });
   } finally {
     if (dbConnection) dbConnection.release();
   }
 };
+

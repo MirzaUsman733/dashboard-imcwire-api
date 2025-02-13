@@ -73,7 +73,7 @@ router.get(
 // Protect route so only superadmin can access
 router.get(
   "/superadmin/user/:userId",
-  SuperAdminAuthMiddleware,
+  AdminOrSuperAdminMiddleware,
   authController.getSingleUserProfile
 );
 

@@ -6,11 +6,11 @@ const stripe = require("stripe")(process.env.EXPRESS_STRIPE_SECRET_KEY);
 const crypto = require("crypto");
 const { transporter } = require("../config/transporter");
 // ✅ **Submit PR & Initialize Plan Records if Not Exists**
-require('dotenv').config();
+require("dotenv").config();
 
 // Helper functions for AES encryption and decryption
 function encryptPassword(password) {
-  console.log(password)
+  console.log(password);
   if (!password) {
     throw new Error("Password is required for encryption");
   }
@@ -24,7 +24,6 @@ function encryptPassword(password) {
 
   return { encrypted, iv: iv.toString("hex") };
 }
-
 
 exports.submitPR = async (req, res) => {
   const {
@@ -47,9 +46,17 @@ exports.submitPR = async (req, res) => {
   if (!plan_id) missingFields.push("plan_id");
   if (!prType) missingFields.push("prType");
   if (!payment_method) missingFields.push("payment_method");
-  if (!targetCountries || !Array.isArray(targetCountries) || targetCountries.length === 0)
+  if (
+    !targetCountries ||
+    !Array.isArray(targetCountries) ||
+    targetCountries.length === 0
+  )
     missingFields.push("targetCountries (should be a non-empty array)");
-  if (!industryCategories || !Array.isArray(industryCategories) || industryCategories.length === 0)
+  if (
+    !industryCategories ||
+    !Array.isArray(industryCategories) ||
+    industryCategories.length === 0
+  )
     missingFields.push("industryCategories (should be a non-empty array)");
   if (!total_price) missingFields.push("total_price");
   if (!pr_status) missingFields.push("pr_status");
@@ -59,7 +66,9 @@ exports.submitPR = async (req, res) => {
   if (missingFields.length > 0) {
     return res
       .status(400)
-      .json({ message: "Missing required fields: " + missingFields.join(", ") });
+      .json({
+        message: "Missing required fields: " + missingFields.join(", "),
+      });
   }
 
   // Validate each target country object
@@ -72,7 +81,10 @@ exports.submitPR = async (req, res) => {
       targetCountryErrors.push(`targetCountries[${index}].price is missing.`);
     }
     if (country.translationRequired) {
-      if (country.translationPrice === undefined || country.translationPrice === null) {
+      if (
+        country.translationPrice === undefined ||
+        country.translationPrice === null
+      ) {
         targetCountryErrors.push(
           `targetCountries[${index}].translationPrice is missing while translationRequired is provided.`
         );
@@ -84,16 +96,22 @@ exports.submitPR = async (req, res) => {
   const industryCategoryErrors = [];
   industryCategories.forEach((category, index) => {
     if (!category.name) {
-      industryCategoryErrors.push(`industryCategories[${index}].name is missing.`);
+      industryCategoryErrors.push(
+        `industryCategories[${index}].name is missing.`
+      );
     }
     if (category.price === undefined || category.price === null) {
-      industryCategoryErrors.push(`industryCategories[${index}].price is missing.`);
+      industryCategoryErrors.push(
+        `industryCategories[${index}].price is missing.`
+      );
     }
   });
 
   // If there are errors in the arrays, return them
   if (targetCountryErrors.length > 0 || industryCategoryErrors.length > 0) {
-    const errors = [...targetCountryErrors, ...industryCategoryErrors].join(" ");
+    const errors = [...targetCountryErrors, ...industryCategoryErrors].join(
+      " "
+    );
     return res.status(400).json({ message: "Validation errors: " + errors });
   }
 
@@ -239,22 +257,29 @@ exports.submitPR = async (req, res) => {
       paymentUrl = session.url;
     } else if (payment_method === "Paypro") {
       // Authenticate with Paypro
-      const authResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientid: process.env.clientid,
-          clientsecret: process.env.clientsecret,
-        }),
-      });
+      const authResponse = await fetch(
+        `${process.env.Paypro_URL}/v2/ppro/auth`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientid: process.env.clientid,
+            clientsecret: process.env.clientsecret,
+          }),
+        }
+      );
       if (!authResponse.ok) {
         await dbConnection.rollback();
-        return res.status(401).json({ message: "Authentication failed with Paypro." });
+        return res
+          .status(401)
+          .json({ message: "Authentication failed with Paypro." });
       }
       const tokenFromPaypro = authResponse.headers.get("Token");
       if (!tokenFromPaypro) {
         await dbConnection.rollback();
-        return res.status(401).json({ message: "Unauthorized: No token received from Paypro." });
+        return res
+          .status(401)
+          .json({ message: "Unauthorized: No token received from Paypro." });
       }
 
       // Prepare order details for Paypro
@@ -280,11 +305,17 @@ exports.submitPR = async (req, res) => {
       ];
 
       // Create order with Paypro
-      const orderResponse = await fetch(`${process.env.Paypro_URL}/v2/ppro/co`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Token: tokenFromPaypro },
-        body: JSON.stringify(orderPayload),
-      });
+      const orderResponse = await fetch(
+        `${process.env.Paypro_URL}/v2/ppro/co`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Token: tokenFromPaypro,
+          },
+          body: JSON.stringify(orderPayload),
+        }
+      );
       const result = await orderResponse.json();
       if (orderResponse.ok && result[0]?.Status === "00") {
         paymentUrl = `${result[1]?.Click2Pay}&callback_url=https://dashboard.imcwire.com/thankyou`;
@@ -345,7 +376,9 @@ exports.submitPR = async (req, res) => {
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     console.error("Error in submitPR:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     if (dbConnection) await dbConnection.release();
   }
@@ -355,14 +388,14 @@ exports.submitPR = async (req, res) => {
 
 // Helper function to generate a strong password of a given length.
 function generateStrongPassword(length) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+[]{}|;:,.<>?";
   let password = "";
   for (let i = 0; i < length; i++) {
     password += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return password;
 }
-
 
 // Main function that handles adding a user PR order.
 exports.addUserPrOrder = async (req, res) => {
@@ -389,7 +422,8 @@ exports.addUserPrOrder = async (req, res) => {
       type,
     } = req.body;
     // PR order details
-    const { prType, pr_status, total_price, payment_status, ip_address } = req.body;
+    const { prType, pr_status, total_price, payment_status, ip_address } =
+      req.body;
     // Arrays for target countries and industry categories
     const { targetCountries, industryCategories } = req.body;
     // Payment history details for manual payment
@@ -401,20 +435,35 @@ exports.addUserPrOrder = async (req, res) => {
         message: "Missing required user fields: username and email",
       });
     }
-    if (!prType || !pr_status || !total_price || !payment_status || !ip_address) {
+    if (
+      !prType ||
+      !pr_status ||
+      !total_price ||
+      !payment_status ||
+      !ip_address
+    ) {
       return res.status(400).json({
         message:
           "Missing required PR order fields: prType, pr_status, total_price, payment_status, ip_address",
       });
     }
-    if (!targetCountries || !Array.isArray(targetCountries) || targetCountries.length === 0) {
+    if (
+      !targetCountries ||
+      !Array.isArray(targetCountries) ||
+      targetCountries.length === 0
+    ) {
       return res.status(400).json({
         message: "targetCountries is required and should be a non-empty array",
       });
     }
-    if (!industryCategories || !Array.isArray(industryCategories) || industryCategories.length === 0) {
+    if (
+      !industryCategories ||
+      !Array.isArray(industryCategories) ||
+      industryCategories.length === 0
+    ) {
       return res.status(400).json({
-        message: "industryCategories is required and should be a non-empty array",
+        message:
+          "industryCategories is required and should be a non-empty array",
       });
     }
 
@@ -427,7 +476,10 @@ exports.addUserPrOrder = async (req, res) => {
         targetCountryErrors.push(`targetCountries[${index}].price is missing.`);
       }
       if (country.translationRequired) {
-        if (country.translationPrice === undefined || country.translationPrice === null) {
+        if (
+          country.translationPrice === undefined ||
+          country.translationPrice === null
+        ) {
           targetCountryErrors.push(
             `targetCountries[${index}].translationPrice is missing while translationRequired is provided.`
           );
@@ -438,15 +490,24 @@ exports.addUserPrOrder = async (req, res) => {
     const industryCategoryErrors = [];
     industryCategories.forEach((category, index) => {
       if (!category.categoryName) {
-        industryCategoryErrors.push(`industryCategories[${index}].name is missing.`);
+        industryCategoryErrors.push(
+          `industryCategories[${index}].name is missing.`
+        );
       }
-      if (category.categoryPrice === undefined || category.categoryPrice === null) {
-        industryCategoryErrors.push(`industryCategories[${index}].price is missing.`);
+      if (
+        category.categoryPrice === undefined ||
+        category.categoryPrice === null
+      ) {
+        industryCategoryErrors.push(
+          `industryCategories[${index}].price is missing.`
+        );
       }
     });
 
     if (targetCountryErrors.length > 0 || industryCategoryErrors.length > 0) {
-      const errors = [...targetCountryErrors, ...industryCategoryErrors].join(" ");
+      const errors = [...targetCountryErrors, ...industryCategoryErrors].join(
+        " "
+      );
       return res.status(400).json({ message: "Validation errors: " + errors });
     }
 
@@ -455,7 +516,10 @@ exports.addUserPrOrder = async (req, res) => {
     let originalPasswordForEmail = "";
     let isNewUser = false;
 
-    const [existingUser] = await dbConnection.query("SELECT * FROM auth_user WHERE email = ?", [email]);
+    const [existingUser] = await dbConnection.query(
+      "SELECT * FROM auth_user WHERE email = ?",
+      [email]
+    );
 
     if (existingUser.length > 0) {
       user_id = existingUser[0].auth_user_id;
@@ -470,33 +534,58 @@ exports.addUserPrOrder = async (req, res) => {
 
       const salt = await bcrypt.genSalt(10);
       const password_hash = await bcrypt.hash(userPassword, salt);
-      console.log(password_hash)
+      console.log(password_hash);
       const { encrypted, iv } = encryptPassword(userPassword);
       const [userInsertResult] = await dbConnection.query(
         "INSERT INTO auth_user (username, email, password, aes_password, role, isAgency, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [username, email, password_hash, `${encrypted}:${iv}`, role || "user", isAgency || false, "active"]
+        [
+          username,
+          email,
+          password_hash,
+          `${encrypted}:${iv}`,
+          role || "user",
+          isAgency || false,
+          "active",
+        ]
       );
-      console.log(userInsertResult)
+      console.log(userInsertResult);
       user_id = userInsertResult.insertId;
     }
 
     // ─── HANDLE PLAN DETAILS ────────────────────────────────────────────────
     let finalPlanId = plan_id;
     if (!plan_id && perma) {
-      const [existingPlan] = await dbConnection.query("SELECT id FROM plan_items WHERE perma = ?", [perma]);
+      const [existingPlan] = await dbConnection.query(
+        "SELECT id FROM plan_items WHERE perma = ?",
+        [perma]
+      );
       if (existingPlan.length > 0) {
         await dbConnection.rollback();
-        return res.status(409).json({ message: "Perma already exists, choose a unique perma" });
+        return res
+          .status(409)
+          .json({ message: "Perma already exists, choose a unique perma" });
       }
       const [planResult] = await dbConnection.query(
         "INSERT INTO plan_items (planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [planName, perma, totalPlanPrice, priceSingle, planDescription, pdfLink, numberOfPR, activate_plan, type]
+        [
+          planName,
+          perma,
+          totalPlanPrice,
+          priceSingle,
+          planDescription,
+          pdfLink,
+          numberOfPR,
+          activate_plan,
+          type,
+        ]
       );
       finalPlanId = planResult.insertId;
     }
     if (!finalPlanId) {
       await dbConnection.rollback();
-      return res.status(400).json({ message: "A valid plan_id or plan details are required." });
+      return res
+        .status(400)
+        .json({ message: "A valid plan_id or plan details are required." });
     }
     const [planItem] = await dbConnection.query(
       "SELECT planName, numberOfPR, activate_plan FROM plan_items WHERE id = ?",
@@ -508,7 +597,9 @@ exports.addUserPrOrder = async (req, res) => {
     }
     if (planItem[0].activate_plan !== 1) {
       await dbConnection.rollback();
-      return res.status(403).json({ message: "The selected plan is not activated yet." });
+      return res
+        .status(403)
+        .json({ message: "The selected plan is not activated yet." });
     }
     const planNameForEmail = planItem[0].planName;
     const totalPrs = planItem[0].numberOfPR;
@@ -547,7 +638,17 @@ exports.addUserPrOrder = async (req, res) => {
     // ─── INSERT THE PR ORDER (using manual payment) ─────────────────────────
     const [prResult] = await dbConnection.query(
       "INSERT INTO pr_data (client_id, user_id, plan_id, prType, pr_status, payment_method, total_price, payment_status, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [client_id, user_id, finalPlanId, prType, pr_status, "manual_payment", total_price, payment_status, ip_address]
+      [
+        client_id,
+        user_id,
+        finalPlanId,
+        prType,
+        pr_status,
+        "manual_payment",
+        total_price,
+        payment_status,
+        ip_address,
+      ]
     );
     const prId = prResult.insertId;
 
@@ -575,14 +676,26 @@ exports.addUserPrOrder = async (req, res) => {
     // ─── RECORD THE MANUAL PAYMENT IN THE PAYMENT HISTORY ───────────────────
     await dbConnection.query(
       "INSERT INTO payment_history (pr_id, user_id, stripe_session_id, transaction_id, amount, currency, payment_status, payment_method, receipt_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [prId, user_id, "manual_payment", transactionId, amountPaid, currency, "paid", "manual_payment", receiptEmail]
+      [
+        prId,
+        user_id,
+        "manual_payment",
+        transactionId,
+        amountPaid,
+        currency,
+        "paid",
+        "manual_payment",
+        receiptEmail,
+      ]
     );
 
     // ─── COMMIT THE TRANSACTION ─────────────────────────────────────────────
     await dbConnection.commit();
 
     // ─── CONSTRUCT THE EMAIL CONTENT ─────────────────────────────────────────
-    const greeting = isNewUser ? "<h2>Welcome to IMCWire!</h2>" : "<h2>Hello!</h2>";
+    const greeting = isNewUser
+      ? "<h2>Welcome to IMCWire!</h2>"
+      : "<h2>Hello!</h2>";
     const accountInfo = isNewUser
       ? `<p>Your account has been created with the following credentials:</p>
          <ul>
@@ -622,22 +735,25 @@ exports.addUserPrOrder = async (req, res) => {
       }
     });
 
-    return res.status(201).json({ message: "User PR order added successfully", prId });
+    return res
+      .status(201)
+      .json({ message: "User PR order added successfully", prId });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     console.error("Error in addUserPrOrder:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     if (dbConnection) await dbConnection.release();
   }
 };
 
-
 // API for Super Admin to update only targetCountries and industryCategories
 exports.updatePRCountriesAndCategories = async (req, res) => {
   const { pr_id } = req.params; // PR ID from URL
   const { targetCountries, industryCategories } = req.body;
-  console.log(req)
+  console.log(req);
   if (!pr_id) {
     return res.status(400).json({ message: "PR ID is required" });
   }
@@ -648,15 +764,24 @@ exports.updatePRCountriesAndCategories = async (req, res) => {
     await dbConnection.beginTransaction(); // Begin Transaction
 
     // Fetch existing PR record
-    const [existingPR] = await dbConnection.query("SELECT id FROM pr_data WHERE id = ?", [pr_id]);
+    const [existingPR] = await dbConnection.query(
+      "SELECT id FROM pr_data WHERE id = ?",
+      [pr_id]
+    );
     if (existingPR.length === 0) {
       await dbConnection.rollback();
       return res.status(404).json({ message: "PR not found" });
     }
 
     // Delete existing target country & category mappings before updating
-    await dbConnection.query("DELETE FROM pr_target_countries WHERE pr_id = ?", [pr_id]);
-    await dbConnection.query("DELETE FROM pr_industry_categories WHERE pr_id = ?", [pr_id]);
+    await dbConnection.query(
+      "DELETE FROM pr_target_countries WHERE pr_id = ?",
+      [pr_id]
+    );
+    await dbConnection.query(
+      "DELETE FROM pr_industry_categories WHERE pr_id = ?",
+      [pr_id]
+    );
 
     // Insert new Target Countries
     for (const country of targetCountries) {
@@ -695,12 +820,15 @@ exports.updatePRCountriesAndCategories = async (req, res) => {
 
     // Commit transaction
     await dbConnection.commit();
-    return res.status(200).json({ message: "PR countries and categories updated successfully" });
-
+    return res
+      .status(200)
+      .json({ message: "PR countries and categories updated successfully" });
   } catch (error) {
     if (dbConnection) await dbConnection.rollback();
     console.error("Error in updatePRCountriesAndCategories:", error);
-    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     if (dbConnection) await dbConnection.release();
   }
@@ -803,7 +931,9 @@ exports.getUserPRs = async (req, res) => {
 
       // Always assign these regardless of singlePRDetails existence
       pr.targetCountries = targetCountries.length ? targetCountries : null;
-      pr.industryCategories = industryCategories.length ? industryCategories : null;
+      pr.industryCategories = industryCategories.length
+        ? industryCategories
+        : null;
       pr.planRecords = planRecords.length ? planRecords : null;
 
       // Fetch single PR details
@@ -826,9 +956,9 @@ exports.getUserPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-              [spd.pdf_id]
-            )
+                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+                [spd.pdf_id]
+              )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -846,21 +976,21 @@ exports.getUserPRs = async (req, res) => {
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         spd.reports = spd.report_id
           ? {
-            id: spd.report_id,
-            title: spd.report_title,
-            excelFile: spd.excel_name
-              ? {
-                name: spd.excel_name,
-                url: spd.excel_url,
-              }
-              : null,
-            pdfFile: spd.pdf_name
-              ? {
-                name: spd.pdf_name,
-                url: spd.pdf_url,
-              }
-              : null,
-          }
+              id: spd.report_id,
+              title: spd.report_title,
+              excelFile: spd.excel_name
+                ? {
+                    name: spd.excel_name,
+                    url: spd.excel_url,
+                  }
+                : null,
+              pdfFile: spd.pdf_name
+                ? {
+                    name: spd.pdf_name,
+                    url: spd.pdf_url,
+                  }
+                : null,
+            }
           : null;
       }
 
@@ -938,7 +1068,9 @@ exports.getAllPRs = async (req, res) => {
 
       // Always assign these regardless of singlePRDetails existence
       pr.targetCountries = targetCountries.length ? targetCountries : null;
-      pr.industryCategories = industryCategories.length ? industryCategories : null;
+      pr.industryCategories = industryCategories.length
+        ? industryCategories
+        : null;
       pr.planRecords = planRecords.length ? planRecords : null;
 
       // Fetch single PR details
@@ -961,9 +1093,9 @@ exports.getAllPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-              [spd.pdf_id]
-            )
+                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+                [spd.pdf_id]
+              )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -981,21 +1113,21 @@ exports.getAllPRs = async (req, res) => {
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         spd.reports = spd.report_id
           ? {
-            id: spd.report_id,
-            title: spd.report_title,
-            excelFile: spd.excel_name
-              ? {
-                name: spd.excel_name,
-                url: spd.excel_url,
-              }
-              : null,
-            pdfFile: spd.pdf_name
-              ? {
-                name: spd.pdf_name,
-                url: spd.pdf_url,
-              }
-              : null,
-          }
+              id: spd.report_id,
+              title: spd.report_title,
+              excelFile: spd.excel_name
+                ? {
+                    name: spd.excel_name,
+                    url: spd.excel_url,
+                  }
+                : null,
+              pdfFile: spd.pdf_name
+                ? {
+                    name: spd.pdf_name,
+                    url: spd.pdf_url,
+                  }
+                : null,
+            }
           : null;
       }
 
@@ -1036,22 +1168,26 @@ exports.getSalesReport = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching sales report:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 
 exports.getUserSalesReport = async (req, res) => {
   try {
     // Ensure that the middleware has provided an authenticated user id.
     const userId = req.user.id;
     if (!userId) {
-      return res.status(401).json({ message: "Unauthorized: No user ID provided." });
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: No user ID provided." });
     }
 
     // Query the sales data for only paid PRs belonging to the authenticated user.
     // Note: We use parameterized queries (the '?' placeholders) to safely inject the userId.
-    const [salesData] = await connection.query(`
+    const [salesData] = await connection.query(
+      `
       SELECT 
         (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
           WHERE DATE(created_at) = CURDATE() 
@@ -1073,11 +1209,15 @@ exports.getUserSalesReport = async (req, res) => {
         (SELECT IFNULL(SUM(total_price), 0) FROM pr_data 
           WHERE payment_status = 'Paid' 
             AND user_id = ?) AS total_sales
-    `, [userId, userId, userId, userId, userId]);
+    `,
+      [userId, userId, userId, userId, userId]
+    );
 
     // Check if any sales data was returned.
     if (!salesData || salesData.length === 0) {
-      return res.status(404).json({ message: "No sales data found for this user." });
+      return res
+        .status(404)
+        .json({ message: "No sales data found for this user." });
     }
 
     // Return the sales report for the authenticated user.
@@ -1090,10 +1230,11 @@ exports.getUserSalesReport = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching user sales report:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
-
 
 // ✅ **Update PR Order Status (SuperAdmin)**
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
@@ -1104,7 +1245,7 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
     if (!prId) {
       return res
         .status(400)
-        .json({ message: "PR ID is required for update the order " });
+        .json({ message: "PR ID is required to update the order" });
     }
 
     // ✅ Check if the PR exists and fetch user_id
@@ -1116,7 +1257,7 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
     if (existingPRs.length === 0) {
       return res.status(404).json({ message: "PR not found" });
     }
-    const userId = existingPRs[0].user_id; // Assuming PR is associated with a single user
+    const userId = existingPRs[0].user_id;
 
     // ✅ Update the status and payment status of the PR data
     const updateResult = await connection.query(
@@ -1125,30 +1266,86 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
     );
 
     if (updateResult.affectedRows === 0) {
-      return res.status(404).json({ message: "No change in status or payment status" });
+      return res
+        .status(404)
+        .json({ message: "No change in status or payment status" });
     }
 
-    // ✅ Add notification for the user
+    // ✅ Add notification for the user in the database
     await connection.query(
       "INSERT INTO notifications (user_id, title, message) VALUES (?, ?, ?)",
       [
         userId,
         `PR Order ${prId} Status and Payment Updated`,
-        `Your PR Order ${prId} status has been updated to ${newStatus} and payment status to ${newPaymentStatus}.`
+        `Your PR Order ${prId} status has been updated to ${newStatus} and payment status to ${newPaymentStatus}.`,
       ]
     );
 
-    res
-      .status(200)
-      .json({ message: "PR status and payment status updated successfully, notification sent" });
+    // ✅ Fetch user details to send email notification
+    const [userResults] = await connection.query(
+      "SELECT email, username FROM users WHERE id = ?",
+      [userId]
+    );
+
+    if (userResults.length > 0) {
+      const { email, username } = userResults[0];
+
+      // Customize email content based on the new status and payment status
+      const subject = `Your PR Order ${prId} Has Been Updated`;
+      const htmlContent = `
+        <html>
+          <body>
+            <div style="background-color: #fff; padding: 20px; border-radius: 10px; 
+                        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
+              <h2>Dear ${username},</h2>
+              <p>Your PR Order <strong>${prId}</strong> has been updated.</p>
+              <p><strong>New PR Status:</strong> ${newStatus}</p>
+              <p><strong>New Payment Status:</strong> ${newPaymentStatus}</p>
+              <p>If you have any questions, please feel free to contact our support team.</p>
+              <p>Thank you for choosing IMCWire.</p>
+              <p>Warm regards,</p>
+              <p>The IMCWire Team</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      // Send email to the user
+      const mailOptions = {
+        from: `IMCWire <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: subject,
+        html: htmlContent,
+      };
+      await transporter.sendMail(mailOptions);
+
+      // ✅ Also send a notification email to the static admin addresses
+      const adminEmails = [
+        "admin@imcwire.com",
+        "imcwirenotifications@gmail.com",
+      ];
+      const adminMailOptions = {
+        from: `IMCWire <${process.env.SMTP_USER}>`,
+        to: adminEmails.join(","),
+        subject: `PR Order ${prId} Status Updated`,
+        text: `User ${username} (Email: ${email}) has an updated PR Order ${prId}.
+New PR Status: ${newStatus}
+New Payment Status: ${newPaymentStatus}`,
+      };
+      await transporter.sendMail(adminMailOptions);
+    }
+
+    res.status(200).json({
+      message:
+        "PR status and payment status updated successfully, notification and emails sent",
+    });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Internal Server Error", error: error.message });
+    res.status(500).json({
+      message: "Internal Server Error",
+      error: error.message,
+    });
   }
 };
-
-
 
 // ✅ **Retrieve PRs for Logged-in User**
 exports.getUserPRsById = async (req, res) => {
@@ -1167,7 +1364,6 @@ exports.getUserPRsById = async (req, res) => {
        JOIN plan_items pi ON pr.plan_id = pi.id
        ORDER BY pr.created_at DESC`
     );
-
 
     if (prData.length === 0) {
       return res.status(404).json({ message: "No PRs found for this user" });
@@ -1221,9 +1417,9 @@ exports.getUserPRsById = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-              [spd.pdf_id]
-            )
+                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+                [spd.pdf_id]
+              )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -1245,24 +1441,29 @@ exports.getUserPRsById = async (req, res) => {
         spd.pdfFile = pdfFile.length ? pdfFile[0] : null;
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         // Filter out null values in case no report data exists
-        spd.reports = spd.report_id ? {
-          id: spd.report_id,
-          title: spd.report_title,
-          excelFile: spd.excel_name ? {
-            name: spd.excel_name,
-            url: spd.excel_url
-          } : null,
-          pdfFile: spd.pdf_name ? {
-            name: spd.pdf_name,
-            url: spd.pdf_url
-          } : null
-        } : null;
+        spd.reports = spd.report_id
+          ? {
+              id: spd.report_id,
+              title: spd.report_title,
+              excelFile: spd.excel_name
+                ? {
+                    name: spd.excel_name,
+                    url: spd.excel_url,
+                  }
+                : null,
+              pdfFile: spd.pdf_name
+                ? {
+                    name: spd.pdf_name,
+                    url: spd.pdf_url,
+                  }
+                : null,
+            }
+          : null;
       }
 
       // Add Single PR Details to PR Object
       pr.singlePRDetails = singlePRDetails;
     }
-
 
     res.status(200).json(prData);
   } catch (error) {
@@ -1440,8 +1641,6 @@ exports.submitCustomOrder = async (req, res) => {
     if (dbConnection) dbConnection.release();
   }
 };
-
-
 
 // exports.getCustomOrder = async (req, res) => {
 //   const { orderId } = req.params;
@@ -1641,17 +1840,17 @@ exports.getCustomOrder = async (req, res) => {
       discountAmount: customOrder.discountAmount,
       planData: planData
         ? {
-          plan_id: planData.id,
-          planName: planData.planName,
-          perma: planData.perma,
-          totalPlanPrice: planData.totalPlanPrice,
-          priceSingle: planData.priceSingle,
-          planDescription: planData.planDescription,
-          pdfLink: planData.pdfLink,
-          numberOfPR: planData.numberOfPR,
-          activate_plan: planData.activate_plan,
-          type: planData.type,
-        }
+            plan_id: planData.id,
+            planName: planData.planName,
+            perma: planData.perma,
+            totalPlanPrice: planData.totalPlanPrice,
+            priceSingle: planData.priceSingle,
+            planDescription: planData.planDescription,
+            pdfLink: planData.pdfLink,
+            numberOfPR: planData.numberOfPR,
+            activate_plan: planData.activate_plan,
+            type: planData.type,
+          }
         : null,
       invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.perma}`,
     };
@@ -1718,19 +1917,19 @@ exports.getAllCustomOrders = async (req, res) => {
         discountValue: order.discountValue, // ✅ Added discountValue
         discountAmount: order.discountAmount, // ✅ Added discountAmount
         created_at: order.created_at,
-        invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${order.perma}`,
+        invoiceUrl: `https://dashboard.imcwire.com/dashboard/custom-invoice/${order.perma}`,
         plan: order.planName
           ? {
-            plan_id: order.plan_id,
-            planName: order.planName,
-            totalPlanPrice: order.totalPlanPrice,
-            priceSingle: order.priceSingle,
-            planDescription: order.planDescription,
-            pdfLink: order.pdfLink,
-            numberOfPR: order.numberOfPR,
-            activate_plan: order.activate_plan,
-            type: order.type,
-          }
+              plan_id: order.plan_id,
+              planName: order.planName,
+              totalPlanPrice: order.totalPlanPrice,
+              priceSingle: order.priceSingle,
+              planDescription: order.planDescription,
+              pdfLink: order.pdfLink,
+              numberOfPR: order.numberOfPR,
+              activate_plan: order.activate_plan,
+              type: order.type,
+            }
           : null,
         targetCountries: [],
         industryCategories: [],

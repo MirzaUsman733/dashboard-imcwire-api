@@ -483,7 +483,7 @@ exports.createFullReport = async (req, res) => {
                 box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
               }
               .header {
-                background: #004085;
+                background: #482D70;
                 color: #ffffff;
                 text-align: center;
                 padding: 10px;
@@ -503,7 +503,7 @@ exports.createFullReport = async (req, res) => {
               }
               .button {
                 display: inline-block;
-                background: #004085;
+                background: #482D70;
                 color: #ffffff;
                 padding: 10px 20px;
                 text-decoration: none;
@@ -523,8 +523,8 @@ exports.createFullReport = async (req, res) => {
                 <p>You can check the details of your report in your dashboard.</p>
                 <p>Additionally, you can download the published report in the following formats:</p>
                 <p>
-                  ${pdfFtpPath ? `<a href="${pdfFtpPath.replace("/public_html/files", "")}" class="button">Download PDF</a>` : ""}
-                  ${excelFtpPath ? `<a href="${excelFtpPath.replace("/public_html/files", "")}" class="button">Download Excel</a>` : ""}
+                  ${pdfFtpPath ? `<a href="https://files.imcwire.com${pdfFtpPath.replace("/public_html/files", "")}" class="button" style="color: white;">Download PDF</a>` : ""}
+                  ${excelFtpPath ? `<a href="https://files.imcwire.com${excelFtpPath.replace("/public_html/files", "")}" class="button" style="color: white;">Download Excel</a>` : ""}
                 </p>
                 <p>If you have any questions, feel free to contact our support team.</p>
                 <p>Best Regards,</p>
