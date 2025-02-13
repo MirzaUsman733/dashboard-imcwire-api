@@ -22,7 +22,7 @@ const app = express();
 // Middleware
 app.use(helmet());
 app.use(cors());
-app.use("/api/stripe-webhook", webhookRoutes);
+app.use("/api/stripe-webhooks", webhookRoutes);
 app.use(
   compression({
     filter: (req, res) => {

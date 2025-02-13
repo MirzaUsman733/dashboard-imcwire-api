@@ -144,7 +144,7 @@ exports.registerUser = async (req, res) => {
 // Login user
 exports.loginUser = async (req, res) => {
   const { email, password, ipAddress } = req.body;
-
+console.log(email, password)
   try {
     const [results] = await connection.query(
       "SELECT * FROM auth_user WHERE email = ?",
