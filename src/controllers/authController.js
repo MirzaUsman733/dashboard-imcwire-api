@@ -76,6 +76,29 @@ exports.registerUser = async (req, res) => {
         "active",
       ]
     );
+    // Build the new user object for the response
+    const newUser = {
+      id: result.insertId,
+      name: username,
+      email,
+      role: role || "user",
+      isAgency: isAgency || false,
+      status: "active",
+      isActive: true,
+    };
+
+    // Generate a JWT token
+    const token = jwt.sign(
+      {
+        id: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        isAgency: newUser.isAgency,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
     const mailOptions = {
       from: `IMCWire <${process.env.SMTP_USER}>`,
       to: email,
@@ -120,10 +143,18 @@ exports.registerUser = async (req, res) => {
       subject: "New User Registration",
       text: `A new user has registered with email: ${email}`,
     };
+
     await transporter.sendMail(adminMailOptions);
     await dbConnection.commit();
     res.status(201).json({
       message: "User registered successfully",
+      token,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      isAgency: newUser.isAgency,
+      status: newUser.status,
+      isActive: newUser.isActive,
     });
   } catch (error) {
     console.error("Error during registration:", error);
