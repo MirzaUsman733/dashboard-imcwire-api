@@ -238,7 +238,7 @@ exports.forgotPassword = async (req, res) => {
     );
 
     // Password Reset URL (Replace with your frontend URL)
-    const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}&email=${email}`;
+    const resetUrl = `https://dashboard.imcwire.com/reset-password?token=${resetToken}&email=${email}`;
 
     // Email Content
     const mailOptions = {

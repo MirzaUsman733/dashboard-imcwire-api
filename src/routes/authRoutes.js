@@ -6,10 +6,12 @@ const authMiddleware = require("../middleware/authMiddleware");
 const apiKeyMiddleware = require("../middleware/apiKeyMiddleware");
 const SuperAdminAuthMiddleware = require("../middleware/SuperAdminAuthMiddleware");
 const AdminOrSuperAdminMiddleware = require("../middleware/AdminOrSuperAdminMiddleware");
+const recaptchaMiddleware = require("../middleware/recaptchaMiddleware");
 
 router.post(
   "/register",
   apiKeyMiddleware,
+  recaptchaMiddleware,
   [
     body("name").notEmpty().withMessage("Name is required"),
     body("email").isEmail().withMessage("Valid email is required"),
@@ -22,6 +24,7 @@ router.post(
 
 router.post(
   "/login",
+  recaptchaMiddleware,
   apiKeyMiddleware,
   [
     body("email").isEmail().withMessage("Valid email is required"),
