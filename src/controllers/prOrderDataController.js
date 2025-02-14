@@ -1236,6 +1236,7 @@ exports.getUserSalesReport = async (req, res) => {
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
   try {
     const { prId } = req.params;
+    console.log(prId)
     const { newStatus, newPaymentStatus } = req.body;
 
     if (!prId) {
@@ -1249,18 +1250,18 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
       "SELECT user_id FROM pr_data WHERE id = ?",
       [prId]
     );
-
     if (existingPRs.length === 0) {
       return res.status(404).json({ message: "PR not found" });
     }
     const userId = existingPRs[0].user_id;
-
+    console.log("Existing Prs: ",existingPRs)
+    console.log(userId)
     // ✅ Update the status and payment status of the PR data
     const updateResult = await connection.query(
       "UPDATE pr_data SET pr_status = ?, payment_status = ? WHERE id = ?",
       [newStatus, newPaymentStatus, prId]
     );
-
+    console.log(updateResult)
     if (updateResult.affectedRows === 0) {
       return res
         .status(404)
@@ -1279,7 +1280,7 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
 
     // ✅ Fetch user details to send email notification
     const [userResults] = await connection.query(
-      "SELECT email, username FROM auth_user WHERE id = ?",
+      "SELECT email, username FROM auth_user WHERE auth_user_id = ?",
       [userId]
     );
 
