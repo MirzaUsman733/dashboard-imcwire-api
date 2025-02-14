@@ -316,7 +316,7 @@ exports.submitSinglePRBySuperAdmin = async (req, res) => {
     // Insert into single_pr_details
     const [singlePrResult] = await dbConnection.query(
       "INSERT INTO single_pr_details (pr_id, user_id, company_id, pr_type) VALUES (?, ?, ?, ?)",
-      [pr_id, user_id, company_id]
+      [pr_id, user_id, company_id, pr_type]
     );
     const singlePrId = singlePrResult.insertId;
     // Update plan_records to increment used PRs
