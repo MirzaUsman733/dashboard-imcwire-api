@@ -200,6 +200,21 @@ exports.submitSinglePR = async (req, res) => {
         [urlInsert.insertId, singlePrId]
       );
     }
+    // Send notification email to admins
+    const adminEmails = ["admin@imcwire.com", "imcwirenotifications@gmail.com"];
+    const adminMailOptions = {
+      from: "IMCWire <Orders@imcwire.com>",
+      to: adminEmails.join(","),
+      subject: `New PR Submission: PR# ${singlePrId}`,
+      html: `
+    <p><strong>Admin Notification</strong></p>
+    <p>A new PR has been submitted with PR# ${singlePrId}.</p>
+    <p>PR Type: ${pr_type}</p>
+    <p>Please review the submission in the admin panel.</p>
+  `,
+    };
+
+    await transporter.sendMail(adminMailOptions);
 
     await dbConnection.commit();
     res.status(201).json({
