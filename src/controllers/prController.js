@@ -39,7 +39,13 @@ exports.submitSinglePR = async (req, res) => {
 
     const pr = prData[0];
     const plan_id = pr.plan_id;
-    // ✅ 2. Validate PR Ownership, Payment, and Approval
+    const auth_user_id = pr.user_id
+    // Fetch the target user details
+    const [targetUsers] = await connection.query(
+      "SELECT * FROM auth_user WHERE auth_user_id = ?",
+      [auth_user_id]
+    );
+    const userEmail = targetUsers[0].email;
     // ✅ 2. Validate PR Ownership, Payment, and Approval
     if (pr.user_id !== user_id)
       return res.status(403).json({ message: "Unauthorized PR access." });
@@ -209,13 +215,35 @@ exports.submitSinglePR = async (req, res) => {
       html: `
     <p><strong>Admin Notification</strong></p>
     <p>A new PR has been submitted with PR# ${singlePrId}.</p>
+    <p>User Email is ${userEmail}.</p>
     <p>PR Type: ${pr_type}</p>
     <p>Please review the submission in the admin panel.</p>
   `,
     };
 
     await transporter.sendMail(adminMailOptions);
+    // ✅ Send notification email to the PR owner (auth_user)
+    const userMailOptions = {
+      from: "IMCWire <Orders@imcwire.com>",
+      to: userEmail,
+      subject: `Your PR Submission #${singlePrId} is Received`,
+      html: `
+    <p><strong>Hello,</strong></p>
+    <p>Your PR submission has been received successfully.</p>
+    <p><strong>PR Details:</strong></p>
+    <ul>
+      <li><strong>PR ID:</strong> ${singlePrId}</li>
+      <li><strong>PR Type:</strong> ${pr_type}</li>
+    </ul>
+    <p>Our team will review your submission and update you soon.</p>
+    <p>For any inquiries, feel free to contact our support team.</p>
+    <br>
+    <p>Best Regards,</p>
+    <p><strong>IMCWire Team</strong></p>
+  `,
+    };
 
+    await transporter.sendMail(userMailOptions);
     await dbConnection.commit();
     res.status(201).json({
       message: "Single PR submitted successfully.",
