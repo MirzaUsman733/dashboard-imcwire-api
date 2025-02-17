@@ -39,7 +39,6 @@ exports.submitPR = async (req, res) => {
 
   // Generate a random client_id
   const client_id = uuidv4();
-
   // Validate main required fields
   const missingFields = [];
   if (!plan_id) missingFields.push("plan_id");
@@ -131,7 +130,6 @@ exports.submitPR = async (req, res) => {
       "SELECT username, email FROM auth_user WHERE auth_user_id = ?",
       [req.user.id]
     );
-
     if (userResult.length === 0) {
       await dbConnection.rollback();
       return res.status(404).json({ message: "User email not found." });
@@ -952,9 +950,9 @@ exports.getUserPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -972,21 +970,21 @@ exports.getUserPRs = async (req, res) => {
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         spd.reports = spd.report_id
           ? {
-              id: spd.report_id,
-              title: spd.report_title,
-              excelFile: spd.excel_name
-                ? {
-                    name: spd.excel_name,
-                    url: spd.excel_url,
-                  }
-                : null,
-              pdfFile: spd.pdf_name
-                ? {
-                    name: spd.pdf_name,
-                    url: spd.pdf_url,
-                  }
-                : null,
-            }
+            id: spd.report_id,
+            title: spd.report_title,
+            excelFile: spd.excel_name
+              ? {
+                name: spd.excel_name,
+                url: spd.excel_url,
+              }
+              : null,
+            pdfFile: spd.pdf_name
+              ? {
+                name: spd.pdf_name,
+                url: spd.pdf_url,
+              }
+              : null,
+          }
           : null;
       }
 
@@ -1089,9 +1087,9 @@ exports.getAllPRs = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -1109,21 +1107,21 @@ exports.getAllPRs = async (req, res) => {
         spd.tagsUrls = tagsUrls.length ? tagsUrls[0] : null;
         spd.reports = spd.report_id
           ? {
-              id: spd.report_id,
-              title: spd.report_title,
-              excelFile: spd.excel_name
-                ? {
-                    name: spd.excel_name,
-                    url: spd.excel_url,
-                  }
-                : null,
-              pdfFile: spd.pdf_name
-                ? {
-                    name: spd.pdf_name,
-                    url: spd.pdf_url,
-                  }
-                : null,
-            }
+            id: spd.report_id,
+            title: spd.report_title,
+            excelFile: spd.excel_name
+              ? {
+                name: spd.excel_name,
+                url: spd.excel_url,
+              }
+              : null,
+            pdfFile: spd.pdf_name
+              ? {
+                name: spd.pdf_name,
+                url: spd.pdf_url,
+              }
+              : null,
+          }
           : null;
       }
 
@@ -1236,7 +1234,6 @@ exports.getUserSalesReport = async (req, res) => {
 exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
   try {
     const { prId } = req.params;
-    console.log(prId)
     const { newStatus, newPaymentStatus } = req.body;
 
     if (!prId) {
@@ -1254,14 +1251,11 @@ exports.updatePROrderStatusBySuperAdmin = async (req, res) => {
       return res.status(404).json({ message: "PR not found" });
     }
     const userId = existingPRs[0].user_id;
-    console.log("Existing Prs: ",existingPRs)
-    console.log(userId)
     // ✅ Update the status and payment status of the PR data
     const updateResult = await connection.query(
       "UPDATE pr_data SET pr_status = ?, payment_status = ? WHERE id = ?",
       [newStatus, newPaymentStatus, prId]
     );
-    console.log(updateResult)
     if (updateResult.affectedRows === 0) {
       return res
         .status(404)
@@ -1414,9 +1408,9 @@ exports.getUserPRsById = async (req, res) => {
           ]),
           spd.pdf_id
             ? connection.query(
-                `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
-                [spd.pdf_id]
-              )
+              `SELECT pdf.* FROM pr_pdf_files pdf WHERE pdf.id = ?`,
+              [spd.pdf_id]
+            )
             : Promise.resolve([[]]),
           connection.query(
             `SELECT t.*, ut.url
@@ -1440,21 +1434,21 @@ exports.getUserPRsById = async (req, res) => {
         // Filter out null values in case no report data exists
         spd.reports = spd.report_id
           ? {
-              id: spd.report_id,
-              title: spd.report_title,
-              excelFile: spd.excel_name
-                ? {
-                    name: spd.excel_name,
-                    url: spd.excel_url,
-                  }
-                : null,
-              pdfFile: spd.pdf_name
-                ? {
-                    name: spd.pdf_name,
-                    url: spd.pdf_url,
-                  }
-                : null,
-            }
+            id: spd.report_id,
+            title: spd.report_title,
+            excelFile: spd.excel_name
+              ? {
+                name: spd.excel_name,
+                url: spd.excel_url,
+              }
+              : null,
+            pdfFile: spd.pdf_name
+              ? {
+                name: spd.pdf_name,
+                url: spd.pdf_url,
+              }
+              : null,
+          }
           : null;
       }
 
@@ -1837,17 +1831,17 @@ exports.getCustomOrder = async (req, res) => {
       discountAmount: customOrder.discountAmount,
       planData: planData
         ? {
-            plan_id: planData.id,
-            planName: planData.planName,
-            perma: planData.perma,
-            totalPlanPrice: planData.totalPlanPrice,
-            priceSingle: planData.priceSingle,
-            planDescription: planData.planDescription,
-            pdfLink: planData.pdfLink,
-            numberOfPR: planData.numberOfPR,
-            activate_plan: planData.activate_plan,
-            type: planData.type,
-          }
+          plan_id: planData.id,
+          planName: planData.planName,
+          perma: planData.perma,
+          totalPlanPrice: planData.totalPlanPrice,
+          priceSingle: planData.priceSingle,
+          planDescription: planData.planDescription,
+          pdfLink: planData.pdfLink,
+          numberOfPR: planData.numberOfPR,
+          activate_plan: planData.activate_plan,
+          type: planData.type,
+        }
         : null,
       invoiceUrl: `https://dashboard.imcwire.com/custom-invoice/${customOrder.perma}`,
     };
@@ -1917,16 +1911,16 @@ exports.getAllCustomOrders = async (req, res) => {
         invoiceUrl: `https://dashboard.imcwire.com/dashboard/custom-invoice/${order.perma}`,
         plan: order.planName
           ? {
-              plan_id: order.plan_id,
-              planName: order.planName,
-              totalPlanPrice: order.totalPlanPrice,
-              priceSingle: order.priceSingle,
-              planDescription: order.planDescription,
-              pdfLink: order.pdfLink,
-              numberOfPR: order.numberOfPR,
-              activate_plan: order.activate_plan,
-              type: order.type,
-            }
+            plan_id: order.plan_id,
+            planName: order.planName,
+            totalPlanPrice: order.totalPlanPrice,
+            priceSingle: order.priceSingle,
+            planDescription: order.planDescription,
+            pdfLink: order.pdfLink,
+            numberOfPR: order.numberOfPR,
+            activate_plan: order.activate_plan,
+            type: order.type,
+          }
           : null,
         targetCountries: [],
         industryCategories: [],

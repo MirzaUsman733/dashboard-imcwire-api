@@ -17,14 +17,14 @@ exports.handleStripeWebhook = async (req, res) => {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
+    const clientReferenceId = session.client_reference_id;
+    const transactionId = session.id;
+    const amountPaid = session.amount_total / 100; // Convert cents to dollars
+    const currency = session.currency;
+    const receiptEmail = session.customer_email;
+    const paymentMethod = session.payment_method_types[0];
+    const paymentStatus = session.payment_status; // 'paid' or 'unpaid'
     if (session.payment_status === "paid") {
-      const clientReferenceId = session.client_reference_id;
-      const transactionId = session.id;
-      const amountPaid = session.amount_total / 100; // Convert cents to dollars
-      const currency = session.currency;
-      const receiptEmail = session.customer_email;
-      const paymentMethod = session.payment_method_types[0];
-      const paymentStatus = session.payment_status; // 'paid' or 'unpaid'
 
       let dbConnection;
       try {
@@ -33,15 +33,28 @@ exports.handleStripeWebhook = async (req, res) => {
 
         // ✅ Get PR Data for the Transaction
         const [prData] = await dbConnection.query(
-          "SELECT id, user_id FROM pr_data WHERE client_id = ?",
+          "SELECT id, plan_id, user_id FROM pr_data WHERE client_id = ?",
           [clientReferenceId]
         );
 
         if (!prData.length) {
           throw new Error("PR data not found for this transaction.");
         }
-
         const prId = prData[0].id;
+        const plan_item_id = prData[0].plan_id;
+        const [planData] = await dbConnection.query(
+          "SELECT id, type FROM plan_items WHERE id = ?",
+          [plan_item_id]
+        );
+
+        const { type } = planData[0];
+        // 3️⃣ Update `activate_plan` (plan activation) if provided & plan exists
+        if (type === 'custom-plan') {
+          await dbConnection.query(
+            "UPDATE plan_items SET activate_plan = ? WHERE id = ?",
+            [0, plan_item_id]
+          );
+        }
         const userId = prData[0].user_id;
         if (paymentStatus === "paid") {
           // ✅ Update PR Status to "paid"
