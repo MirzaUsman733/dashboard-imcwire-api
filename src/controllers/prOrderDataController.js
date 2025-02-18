@@ -1785,6 +1785,10 @@ exports.getCustomOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
     const customOrder = orderResult[0];
+    // Check if activation_plan is true
+    if (!customOrder.plan_id || customOrder.activation_plan !== true) {
+      return res.status(403).json({ message: "Activation plan is expire or not valid" });
+    }
 
     // 2. Fetch Target Countries Linked to the Order
     const [targetCountries] = await dbConnection.query(

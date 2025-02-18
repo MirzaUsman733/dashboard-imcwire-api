@@ -1,0 +1,301 @@
+erDiagram
+    AUTH_USER ||--o{ USER_PROFILE : has
+    AUTH_USER ||--o{ COMPANIES : owns
+    AUTH_USER ||--o{ PR_DATA : creates
+    AUTH_USER ||--o{ PAYMENT_HISTORY : makes
+    AUTH_USER ||--o{ PLAN_RECORDS : has
+    AUTH_USER ||--o{ REPORTS : generates
+
+    COMPANIES ||--o{ SINGLE_PR_DETAILS : associated_with
+
+    PLAN_ITEMS ||--o{ PR_DATA : associated_with
+    PLAN_ITEMS ||--o{ PLAN_RECORDS : of
+    PLAN_ITEMS ||--o{ COUPONS : applies_to
+    PLAN_ITEMS ||--o{ CUSTOM_ORDERS : has
+
+    PR_DATA ||--o{ SINGLE_PR_DETAILS : contains
+    PR_DATA ||--o{ PR_TARGET_COUNTRIES : has
+    PR_DATA ||--o{ PR_INDUSTRY_CATEGORIES : has
+    PR_DATA ||--o{ PAYMENT_HISTORY : for
+    PR_DATA ||--o{ REPORTS : about
+    PR_DATA ||--o{ PLAN_RECORDS : uses
+
+    SINGLE_PR_DETAILS ||--o{ PR_PDF_FILES : has
+    SINGLE_PR_DETAILS ||--o{ PR_URL_TAGS : has
+    SINGLE_PR_DETAILS ||--o{ SINGLE_PR_TAGS : has
+    SINGLE_PR_DETAILS ||--o{ REPORTS : details
+
+    TAGS ||--o{ SINGLE_PR_TAGS : used_in
+
+    TARGET_COUNTRIES ||--o{ PR_TARGET_COUNTRIES : used_in
+    TARGET_COUNTRIES ||--o{ CUSTOM_ORDER_TARGET_COUNTRIES : used_in
+    %% TARGET_COUNTRIES ||--o{ CUSTOM_PLAN_TARGET_COUNTRIES : used_in
+
+    INDUSTRY_CATEGORIES ||--o{ PR_INDUSTRY_CATEGORIES : used_in
+    INDUSTRY_CATEGORIES ||--o{ CUSTOM_ORDER_INDUSTRY_CATEGORIES : used_in
+    %% INDUSTRY_CATEGORIES ||--o{ CUSTOM_Order_INDUSTRY_CATEGORIES : used_in
+
+    TRANSLATION_REQUIRED ||--o{ TARGET_COUNTRIES : applies_to
+    TRANSLATION_REQUIRED ||--o{ PR_DATA : needed_for
+
+    CUSTOM_ORDERS ||--o{ CUSTOM_ORDER_INDUSTRY_CATEGORIES : has
+    CUSTOM_ORDERS ||--o{ CUSTOM_ORDER_TARGET_COUNTRIES : has
+
+    REPORTS ||--o{ REPORT_EXCEL_FILES : has
+    REPORTS ||--o{ REPORT_PR_PDFS : has
+
+    PR_PDF_FILES ||--o{ REPORT_PR_PDFS : included_in
+
+     AUTH_USER {
+        int auth_user_id PK
+        string username
+        string email UNIQUE
+        string password
+        enum role DEFAULT "user"
+        string reset_token
+        timestamp reset_token_expires
+        timestamp created_at
+        timestamp updated_at
+        tinyint isAgency
+        enum status
+        string aes_password
+    }
+   USER_PROFILE {
+        int id PK
+        int user_id FK
+        string full_name
+        string image_url
+        string street_address
+        string city
+        string country
+        string zip_code
+        string phone_number
+        enum gender
+        date date_of_birth
+        timestamp created_at
+        timestamp updated_at
+    }
+     COMPANIES {
+        int id PK
+        int user_id FK
+        string companyName
+        string address1
+        string address2
+        string contactName
+        string phone
+        string email
+        string country
+        string city
+        string state
+        string websiteUrl
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    PR_DATA {
+        int id PK
+        int user_id FK
+        int plan_id FK
+        string client_id
+        string prType "enum: Self-Written, IMCWire Written"
+        string pr_status "enum: Pending, Approved, Rejected, Published"
+        string payment_method "enum: Stripe, Paypro, manual_payment"
+        int target_country_id
+        int translation_required_id
+        int target_industry_id
+         string payment_status "enum: paid, unpaid, refund, self-paid, failed"
+        decimal total_price
+        timestamp created_at
+        string ip_address
+    }
+    SINGLE_PR_DETAILS {
+        int id PK
+        int pr_id FK
+        int user_id FK
+        int company_id FK
+        enum pr_type "enum: Self-Written, IMCWire Written"
+        enum status "enum: Not Started, Pending, Approved, In Progress, Published, Rejected"
+        timestamp created_at
+        timestamp updated_at
+        int pdf_id FK
+        int url_tags_id FK
+    }
+      PLAN_ITEMS {
+        int id PK
+        string planName
+        decimal totalPlanPrice
+        decimal priceSingle
+        text planDescription
+        string pdfLink
+        int numberOfPR
+        timestamp created_at
+        timestamp updated_at
+        tinyint activate_plan
+        string type
+        string perma
+    }
+
+    TARGET_COUNTRIES {
+        int id PK
+        string countryName
+        decimal countryPrice
+        int translation_required_id FK
+        int pr_id FK
+    }
+
+    INDUSTRY_CATEGORIES {
+        int id PK
+        string categoryName
+        decimal categoryPrice
+        int pr_id FK
+    }
+
+    PAYMENT_HISTORY {
+        int id PK
+        int pr_id FK
+        int user_id FK
+        string stripe_session_id
+        string transaction_id
+        decimal amount
+        string currency
+        enum payment_status "enum: pending, paid, failed"
+        string payment_method
+        string receipt_email
+        timestamp created_at
+    }
+
+    PLAN_RECORDS {
+        int id PK
+        int user_id FK
+        int plan_id FK
+        int total_prs
+        int used_prs
+        int pr_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    REPORTS {
+        int id PK
+        int pr_id FK
+        int single_pr_id FK
+        int user_id FK
+        string title
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    PR_PDF_FILES {
+        int id PK
+        int single_pr_id FK
+        string unique_id
+        string pdf_file
+        string url
+        timestamp created_at
+    }
+
+    PR_URL_TAGS {
+        int id PK
+        int single_pr_id FK
+        string url
+        timestamp created_at
+    }
+
+    TAGS {
+        int id PK
+        string name
+        timestamp created_at
+    }
+    SINGLE_PR_TAGS {
+        int single_pr_id PK,FK
+        int tag_id PK,FK
+    }
+    PR_TARGET_COUNTRIES {
+        int id PK
+        int pr_id FK
+        int target_country_id FK
+    }
+    PR_INDUSTRY_CATEGORIES {
+        int id PK
+        int pr_id FK
+        int target_industry_id FK
+    }
+     TRANSLATION_REQUIRED {
+        int id PK
+        int pr_id FK
+        enum translation "enum: Yes, No"
+        decimal translationPrice
+    }
+     COUPONS {
+        int id PK
+        int plan_id FK
+        string couponCode
+        decimal discountPercentage
+        int usageLimit
+        int timesUsed
+        datetime expirationDate
+        enum status "enum: active, expired, used_up"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CUSTOM_ORDERS {
+        int id PK
+        int plan_id FK
+        string orderId
+        int client_id
+        enum orderType "enum: Standard, Enterprise, Custom"
+        decimal total_price
+        enum payment_status "enum: paid, unpaid"
+        enum payment_method "enum: Paypro, Stripe"
+        tinyint is_active
+        string perma
+        string prType
+        enum discountType "enum: percentage, dollar"
+        decimal discountValue
+        decimal discountAmount
+        timestamp created_at
+    }
+
+    CUSTOM_ORDER_INDUSTRY_CATEGORIES {
+        int id PK
+        int order_id FK
+        int industry_category_id FK
+    }
+
+    CUSTOM_ORDER_TARGET_COUNTRIES {
+        int id PK
+        int order_id FK
+        int target_country_id FK
+    }
+    REPORT_EXCEL_FILES {
+        int id PK
+        int report_id FK
+        string excel_name
+        string excel_url
+        timestamp created_at
+    }
+
+    REPORT_PR_PDFS {
+        int id PK
+        int report_id FK
+        int pr_pdf_id FK
+        string pdf_name
+        string pdf_url
+        timestamp created_at
+    }
+
+    FAQS {
+        int id PK
+        text question
+        text answer
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    HOW_IT_WORKS {
+        int id PK
+        string title
+        string description
+        string youtube_channel
+        timestamp created_at
+    }

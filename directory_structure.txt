@@ -1,0 +1,45 @@
+Directory structure:
+└── mirzausman733-dashboard-imcwire-api/
+    ├── package.json
+    └── src/
+        ├── server.js
+        ├── config/
+        │   ├── dbconfig.js
+        │   ├── ftpConfig.js
+        │   └── transporter.js
+        ├── controllers/
+        │   ├── authController.js
+        │   ├── companyController.js
+        │   ├── couponController.js
+        │   ├── faqController.js
+        │   ├── fileController.js
+        │   ├── howItWorksController.js
+        │   ├── ipController.js
+        │   ├── notificationController.js
+        │   ├── orderController.js
+        │   ├── paymentController.js
+        │   ├── planController.js
+        │   ├── prController.js
+        │   ├── prOrderDataController.js
+        │   ├── reportController.js
+        │   └── webhookController.js
+        ├── middleware/
+        │   ├── AdminAuthMiddleware.js
+        │   ├── AdminOrSuperAdminMiddleware.js
+        │   ├── SuperAdminAuthMiddleware.js
+        │   ├── apiKeyMiddleware.js
+        │   ├── authMiddleware.js
+        │   └── recaptchaMiddleware.js
+        └── routes/
+            ├── authRoutes.js
+            ├── companyRoutes.js
+            ├── couponRoutes.js
+            ├── faqRoutes.js
+            ├── howItWorksRoutes.js
+            ├── ipRoutes.js
+            ├── notificationRoutes.js
+            ├── paymentRoutes.js
+            ├── planRoutes.js
+            ├── prRoutes.js
+            ├── reportRoutes.js
+            └── webhookRoutes.js
