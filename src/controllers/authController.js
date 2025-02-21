@@ -313,9 +313,12 @@ exports.resetPassword = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
+     // Encrypt the password using AES (same method as registerUser)
+     const { encrypted, iv } = encryptPassword(newPassword);
+
     await connection.query(
-      "UPDATE auth_user SET password = ?, reset_token = NULL, reset_token_expires = NULL WHERE email = ?",
-      [hashedPassword, email]
+      "UPDATE auth_user SET password = ?, aes_password = ?, reset_token = NULL, reset_token_expires = NULL WHERE email = ?",
+      [hashedPassword,`${encrypted}:${iv}`, email]
     );
 
     res.status(200).json({ message: "Password reset successful" });
@@ -692,6 +695,9 @@ exports.updateUser = async (req, res) => {
 
       const salt = await bcrypt.genSalt(10);
       userUpdates.password = await bcrypt.hash(newPassword, salt);
+      // Encrypt password using AES for aes_password field
+      const { encrypted, iv } = encryptPassword(newPassword);
+      userUpdates.aes_password = `${encrypted}:${iv}`;
     }
 
     // Update isAgency status
