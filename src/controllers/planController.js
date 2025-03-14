@@ -91,6 +91,15 @@ exports.updatePlan = async (req, res) => {
         return res.status(400).json({ message: "No changes made, plan already in the requested state" });
       }
 
+      // ✅ If deactivating the plan, generate a new random perma
+      if (activate_plan === 0) {
+        const newPerma = generateRandomPerma(); // Function to generate a random perma
+        await dbConnection.query(
+          "UPDATE plan_items SET perma = ? WHERE perma = ?",
+          [newPerma, perma]
+        );
+      }
+
       await dbConnection.commit(); // ✅ Commit transaction
 
       res.status(200).json({
@@ -110,6 +119,12 @@ exports.updatePlan = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
+function generateRandomPerma() {
+  // Function to generate a random perma, you can implement your own logic here
+  return Math.random().toString(36).substr(2, 10); // Example: Generates a random alphanumeric string
+}
+
 
 
 // Get all plans (with optional filtering by type)
